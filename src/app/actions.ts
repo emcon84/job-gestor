@@ -431,6 +431,52 @@ export async function deleteTask(formData: FormData): Promise<ActionResult> {
   return { ok: true, message: "Tarea eliminada." };
 }
 
+/** Sample n8n-automation services (name + default cost in cents) for quick catalog seeding. */
+const SAMPLE_N8N_SERVICES: { name: string; cents: number }[] = [
+  { name: "Automatización lectura de mails + asignación de cuentas", cents: 25_000_00 },
+  { name: "Integración Formulario → Planilla (Google Forms → Sheets)", cents: 20_000_00 },
+  { name: "Avisos automáticos por vencimiento (WhatsApp/Email)", cents: 20_000_00 },
+  { name: "Conciliación bancaria automática", cents: 35_000_00 },
+  { name: "Integración con sistema contable (AFIP / Tango / CMD)", cents: 35_000_00 },
+  { name: "Reporte automático programado", cents: 20_000_00 },
+  { name: "Envío automático de documentación (comprobantes/resúmenes)", cents: 25_000_00 },
+  { name: "Nueva automatización a medida (cotización base)", cents: 30_000_00 },
+  { name: "Mantenimiento y ajuste de flujos existentes", cents: 15_000_00 },
+  { name: "Configuración y soporte de workflows", cents: 15_000_00 },
+];
+
+/** Owner-only: seeds the sample n8n services for a client (skips existing names). */
+export async function seedSampleServices(
+  formData: FormData,
+): Promise<ActionResult> {
+  if (!(await isOwner())) {
+    return { ok: false, error: "No autorizado." };
+  }
+  const clientId = (formData.get("clientId") as string | null)?.trim() ?? "";
+  if (!clientId) {
+    return { ok: false, error: "Falta el cliente." };
+  }
+  const repo = await getRepository();
+  const client = await repo.getClient(clientId);
+  if (!client) {
+    return { ok: false, error: "El cliente no existe." };
+  }
+  const existing = await repo.listServicesByClient(clientId);
+  const existingNames = new Set(existing.map((s) => s.name));
+  let added = 0;
+  for (const s of SAMPLE_N8N_SERVICES) {
+    if (existingNames.has(s.name)) {
+      continue;
+    }
+    await repo.createService({ name: s.name, defaultCostArs: s.cents, clientId });
+    added += 1;
+  }
+  revalidateClient(client.slug);
+  return added > 0
+    ? { ok: true, message: `Servicios de ejemplo cargados (${added}).` }
+    : { ok: true, message: "Los servicios de ejemplo ya estaban cargados." };
+}
+
 /** Owner-only: creates a catalog service for a client with a fixed default cost (pesos -> cents). */
 export async function createService(formData: FormData): Promise<ActionResult> {
   if (!(await isOwner())) {

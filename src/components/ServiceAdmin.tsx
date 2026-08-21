@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createService, deleteService, updateService } from "@/app/actions";
+import { createService, deleteService, seedSampleServices, updateService } from "@/app/actions";
 import type { ActionResult } from "@/lib/action-types";
 import type { ServiceOption } from "@/lib/domain";
 import { centsToPesosInput } from "@/lib/format";
@@ -38,6 +38,16 @@ export default function ServiceAdmin({
     if (r.ok) {
       setName("");
       setCost("");
+      router.refresh();
+    }
+  }
+
+  async function onSeedSamples() {
+    const fd = new FormData();
+    fd.set("clientId", clientId);
+    const r: ActionResult = await seedSampleServices(fd);
+    setMsg(r.ok ? { kind: "success", text: r.message ?? "Cargados." } : { kind: "error", text: r.error ?? "Error." });
+    if (r.ok) {
       router.refresh();
     }
   }
@@ -184,13 +194,22 @@ export default function ServiceAdmin({
           className="rounded-lg border border-card-border bg-surface px-3 py-2 text-sm text-primary"
         />
       </div>
-      <button
-        type="button"
-        onClick={onCreate}
-        className="w-full min-h-11 rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white"
-      >
-        Agregar servicio
-      </button>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={onCreate}
+          className="min-h-11 rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white"
+        >
+          Agregar servicio
+        </button>
+        <button
+          type="button"
+          onClick={onSeedSamples}
+          className="min-h-11 rounded-lg border border-card-border bg-surface px-3 py-2 text-sm font-medium text-secondary transition-colors hover:border-accent hover:text-primary"
+        >
+          Cargar servicios de ejemplo (n8n)
+        </button>
+      </div>
 
       {msg && (
         <p
