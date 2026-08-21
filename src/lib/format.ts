@@ -108,3 +108,31 @@ export function centsToPesosInput(cents: number | null): string {
   }
   return (cents / 100).toFixed(2);
 }
+
+const ES_AR_DATE = new Intl.DateTimeFormat("es-AR", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+});
+
+/**
+ * Formats a Date using es-AR conventions (dd/mm/aaaa).
+ * Example: 2026-08-21 -> "21/08/2026"
+ */
+export function formatDateEs(date: Date): string {
+  return ES_AR_DATE.format(date);
+}
+
+/**
+ * Formats a Date as a plain "YYYY-MM-DD" string using local time, for use as
+ * the value of an `<input type="date">`. Returns "" for null.
+ */
+export function formatDateInput(date: Date | null): string {
+  if (date === null || date === undefined) {
+    return "";
+  }
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}

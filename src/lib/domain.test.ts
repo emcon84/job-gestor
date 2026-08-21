@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   groupByStatus,
+  isDueDateOverdue,
+  parseDueDate,
   resolveCompletedAt,
   validateCommentAuthorName,
   validateCommentBody,
@@ -17,6 +19,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     status: "pending",
     amountArs: 0,
     paymentState: null,
+    paymentDueDate: null,
     serviceId: "s1",
     createdAt: new Date("2026-01-01"),
     updatedAt: new Date("2026-01-01"),
@@ -113,5 +116,63 @@ describe("validateCommentAuthorName", () => {
 
   it("accepts a name exactly at the max length", () => {
     expect(validateCommentAuthorName("a".repeat(60))).toBeNull();
+  });
+});
+
+describe("parseDueDate", () => {
+  it("parses a valid YYYY-MM-DD into a local-midnight Date", () => {
+    const d = parseDueDate("2026-08-21");
+    expect(d).not.toBeNull();
+    expect(d!.getFullYear()).toBe(2026);
+    expect(d!.getMonth()).toBe(7); // August is 0-indexed
+    expect(d!.getDate()).toBe(21);
+    expect(d!.getHours()).toBe(0);
+    expect(d!.getMinutes()).toBe(0);
+  });
+
+  it("handles single-digit month and day", () => {
+    const d = parseDueDate("2026-03-05");
+    expect(d!.getMonth()).toBe(2);
+    expect(d!.getDate()).toBe(5);
+  });
+
+  it("returns null for empty input", () => {
+    expect(parseDueDate("")).toBeNull();
+    expect(parseDueDate("   ")).toBeNull();
+  });
+
+  it("returns null for non-YYYY-MM-DD formats", () => {
+    expect(parseDueDate("21/08/2026")).toBeNull();
+    expect(parseDueDate("2026-8-21")).toBeNull();
+    expect(parseDueDate("20260821")).toBeNull();
+  });
+
+  it("returns null for an invalid calendar date", () => {
+    expect(parseDueDate("2026-02-31")).toBeNull();
+    expect(parseDueDate("2026-13-01")).toBeNull();
+  });
+
+  it("returns null for non-numeric input", () => {
+    expect(parseDueDate("abcdef")).toBeNull();
+    expect(parseDueDate("2026-aa-bb")).toBeNull();
+  });
+});
+
+describe("isDueDateOverdue", () => {
+  const today = new Date(2026, 7, 21); // 2026-08-21 local
+
+  it("is false when the due date is today", () => {
+    const due = new Date(2026, 7, 21);
+    expect(isDueDateOverdue(due, today)).toBe(false);
+  });
+
+  it("is false when the due date is in the future", () => {
+    const due = new Date(2026, 7, 25);
+    expect(isDueDateOverdue(due, today)).toBe(false);
+  });
+
+  it("is true when the due date is before today", () => {
+    const due = new Date(2026, 7, 20);
+    expect(isDueDateOverdue(due, today)).toBe(true);
   });
 });

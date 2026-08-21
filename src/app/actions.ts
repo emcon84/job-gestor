@@ -16,6 +16,7 @@ import type {
 import {
   PRIORITIES,
   STATUSES,
+  parseDueDate,
   validateCommentAuthorName,
   validateCommentBody,
 } from "@/lib/domain";
@@ -208,6 +209,7 @@ export async function updateTask(formData: FormData): Promise<ActionResult> {
   const statusRaw = formData.get("status") as string | null;
   const amountRaw = formData.get("amountArs") as string | null;
   const paymentRaw = formData.get("paymentState") as string | null;
+  const dueDateRaw = formData.get("paymentDueDate") as string | null;
 
   if (statusRaw && !isStatus(statusRaw)) {
     return { ok: false, error: "Estado inválido." };
@@ -225,11 +227,24 @@ export async function updateTask(formData: FormData): Promise<ActionResult> {
     amountArs = cents;
   }
 
+  // Payment due date: empty string -> null (clears); otherwise must parse.
+  let paymentDueDate: Date | null | undefined;
+  if (dueDateRaw !== null && dueDateRaw !== undefined && dueDateRaw.trim() !== "") {
+    const parsed = parseDueDate(dueDateRaw);
+    if (parsed === null) {
+      return { ok: false, error: "Fecha de vencimiento inválida." };
+    }
+    paymentDueDate = parsed;
+  } else if (dueDateRaw !== null && dueDateRaw !== undefined) {
+    paymentDueDate = null;
+  }
+
   const repo = await getRepository();
   const updated = await repo.updateTask(id, {
     status: statusRaw ? (statusRaw as TaskStatus) : undefined,
     amountArs: amountArs ?? undefined,
     paymentState: paymentRaw ? (paymentRaw as PaymentState) : undefined,
+    paymentDueDate,
   });
 
   if (!updated) {

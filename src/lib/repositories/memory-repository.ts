@@ -51,6 +51,7 @@ export class MemoryRepository implements TaskRepository, ServiceRepository {
       status: "pending",
       amountArs: cost ?? 0,
       paymentState: null,
+      paymentDueDate: null,
       serviceId: input.serviceId,
       createdAt: now,
       updatedAt: now,
@@ -78,6 +79,10 @@ export class MemoryRepository implements TaskRepository, ServiceRepository {
         update.paymentState !== undefined
           ? update.paymentState
           : existing.paymentState,
+      paymentDueDate:
+        update.paymentDueDate !== undefined
+          ? update.paymentDueDate
+          : existing.paymentDueDate,
       completedAt: resolveCompletedAt(status, new Date(), existing.completedAt),
       updatedAt: new Date(),
     };

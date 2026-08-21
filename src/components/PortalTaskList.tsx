@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { PRIORITY_LABELS, STATUS_LABELS, type Task } from "@/lib/domain";
-import { formatArs } from "@/lib/format";
+import { PRIORITY_LABELS, STATUS_LABELS, isDueDateOverdue, type Task } from "@/lib/domain";
+import { formatArs, formatDateEs } from "@/lib/format";
 import AttachmentThumbs from "@/components/AttachmentThumbs";
 import PaymentBadge from "@/components/PaymentBadge";
 import PortalTaskItem from "@/components/PortalTaskItem";
@@ -112,6 +112,17 @@ export default function PortalTaskList({ tasks }: { tasks: Task[] }) {
                   {formatArs(task.amountArs)}
                 </span>
                 <PaymentBadge state={task.paymentState} />
+                {task.paymentDueDate && task.paymentState !== "paid" && (
+                  isDueDateOverdue(task.paymentDueDate) ? (
+                    <span className="font-semibold text-status-urgent">
+                      Vencido {formatDateEs(task.paymentDueDate)}
+                    </span>
+                  ) : (
+                    <span className="text-muted">
+                      Vence el {formatDateEs(task.paymentDueDate)}
+                    </span>
+                  )
+                )}
               </div>
 
               {task.attachments.length > 0 && (

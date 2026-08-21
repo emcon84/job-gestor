@@ -102,6 +102,21 @@ describe("MemoryRepository", () => {
     expect(reopened?.completedAt).toBeNull();
   });
 
+  it("round-trips paymentDueDate through updateTask (set then clear with null)", async () => {
+    const created = await repo.createTask(sampleTask());
+    expect(created.paymentDueDate).toBeNull();
+
+    const due = new Date(2026, 8, 15); // 2026-09-15
+    const withDate = await repo.updateTask(created.id, { paymentDueDate: due });
+    expect(withDate?.paymentDueDate).toBe(due);
+
+    const listed = await repo.listTasks();
+    expect(listed[0].paymentDueDate).toBe(due);
+
+    const cleared = await repo.updateTask(created.id, { paymentDueDate: null });
+    expect(cleared?.paymentDueDate).toBeNull();
+  });
+
   it("returns null when updating an unknown task", async () => {
     const result = await repo.updateTask("missing", { status: "done" });
     expect(result).toBeNull();

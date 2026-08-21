@@ -38,6 +38,7 @@ function mapTask(
     status: row.status as TaskStatus,
     amountArs: row.amountArs,
     paymentState: row.paymentState as PaymentState | null,
+    paymentDueDate: row.paymentDueDate,
     serviceId: row.serviceId,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -195,6 +196,10 @@ export class PostgresRepository implements TaskRepository, ServiceRepository {
           update.paymentState !== undefined
             ? update.paymentState
             : existing.paymentState,
+        paymentDueDate:
+          update.paymentDueDate !== undefined
+            ? update.paymentDueDate
+            : existing.paymentDueDate,
         completedAt,
         updatedAt: new Date(),
       })

@@ -9,7 +9,7 @@ import {
   type Task,
   type TaskStatus,
 } from "@/lib/domain";
-import { centsToPesosInput } from "@/lib/format";
+import { centsToPesosInput, formatDateEs, formatDateInput } from "@/lib/format";
 import AttachmentThumbs from "@/components/AttachmentThumbs";
 import CommentThread from "@/components/CommentThread";
 import {
@@ -40,6 +40,7 @@ export default function TaskDetailModal({
   );
   const amountRef = useRef<HTMLInputElement>(null);
   const paymentRef = useRef<HTMLSelectElement>(null);
+  const dueDateRef = useRef<HTMLInputElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -75,6 +76,7 @@ export default function TaskDetailModal({
     fd.set("id", task.id);
     fd.set("amountArs", amountRef.current?.value ?? "");
     fd.set("paymentState", paymentRef.current?.value ?? "");
+    fd.set("paymentDueDate", dueDateRef.current?.value ?? "");
     const r = await updateTask(fd);
     setMsg(
       r.ok
@@ -178,6 +180,26 @@ export default function TaskDetailModal({
                 <option value="paid">Pagado</option>
               </select>
             </div>
+            <div>
+              <label
+                htmlFor="payment-due-date"
+                className="mb-1 block text-xs text-muted"
+              >
+                Vence el pago
+              </label>
+              <input
+                id="payment-due-date"
+                ref={dueDateRef}
+                type="date"
+                defaultValue={formatDateInput(task.paymentDueDate)}
+                className="w-full rounded-lg border border-card-border bg-surface px-2 py-2 text-sm text-primary"
+              />
+            </div>
+            <p className="text-xs text-muted">
+              {task.paymentDueDate
+                ? `Vence: ${formatDateEs(task.paymentDueDate)}`
+                : "Sin vencimiento"}
+            </p>
             <button
               type="button"
               onClick={saveEdits}

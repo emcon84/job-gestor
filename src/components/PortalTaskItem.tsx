@@ -5,9 +5,10 @@ import { X } from "lucide-react";
 import {
   PRIORITY_LABELS,
   STATUS_LABELS,
+  isDueDateOverdue,
   type Task,
 } from "@/lib/domain";
-import { formatArs } from "@/lib/format";
+import { formatArs, formatDateEs } from "@/lib/format";
 import AttachmentThumbs from "@/components/AttachmentThumbs";
 import CommentThread from "@/components/CommentThread";
 import PaymentBadge from "@/components/PaymentBadge";
@@ -106,6 +107,17 @@ function PortalTaskDetailModal({
                 {formatArs(task.amountArs)}
               </span>
               <PaymentBadge state={task.paymentState} />
+              {task.paymentDueDate && task.paymentState !== "paid" && (
+                isDueDateOverdue(task.paymentDueDate) ? (
+                  <span className="font-semibold text-status-urgent">
+                    Vencido {formatDateEs(task.paymentDueDate)}
+                  </span>
+                ) : (
+                  <span className="text-muted">
+                    Vence el {formatDateEs(task.paymentDueDate)}
+                  </span>
+                )
+              )}
             </div>
           </div>
           <button

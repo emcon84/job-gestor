@@ -131,6 +131,8 @@ export interface Task {
   /** Amount in ARS, stored as integer cents. Auto-filled from the assigned service. */
   amountArs: number;
   paymentState: PaymentState | null;
+  /** Optional date by which the payment is due (null = no due date). */
+  paymentDueDate: Date | null;
   /** The catalog service this task is assigned to. */
   serviceId: string;
   createdAt: Date;
@@ -157,6 +159,8 @@ export interface TaskUpdate {
   status?: TaskStatus;
   amountArs?: number;
   paymentState?: PaymentState | null;
+  /** Optional payment due date. `null` clears an existing value. */
+  paymentDueDate?: Date | null;
 }
 
 export type KanbanColumns = Record<TaskStatus, Task[]>;
@@ -196,4 +200,46 @@ export function resolveCompletedAt(
     return null;
   }
   return existing;
+}
+
+/**
+ * Parses a payment due date from an HTML `<input type="date">` value
+ * ("YYYY-MM-DD"). Returns a Date at local midnight, or null when the input is
+ * empty or not a real calendar date (e.g. "2026-02-31").
+ */
+export function parseDueDate(input: string): Date | null {
+  const trimmed = input.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+  if (!match) {
+    return null;
+  }
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(year, month - 1, day);
+  // Reject dates the calendar rolls over (e.g. 2026-02-31 -> March 3rd).
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+  return date;
+}
+
+/**
+ * Whether a payment due date is overdue: strictly before the start of `today`
+ * (compared at date granularity, so the due date itself is not "overdue").
+ */
+export function isDueDateOverdue(dueDate: Date, today: Date = new Date()): boolean {
+  const startOfToday = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+  );
+  return dueDate.getTime() < startOfToday.getTime();
 }

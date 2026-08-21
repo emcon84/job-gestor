@@ -39,6 +39,7 @@ export const tasks = pgTable("tasks", {
     .default("pending"),
   amountArs: integer("amount_ars").notNull(), // cents, auto-filled from service
   paymentState: text("payment_state", { enum: ["paid", "pending"] }),
+  paymentDueDate: timestamp("payment_due_date", { withTimezone: true }),
   serviceId: uuid("service_id")
     .notNull()
     .references(() => services.id),
