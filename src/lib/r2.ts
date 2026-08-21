@@ -12,9 +12,9 @@
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
-export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024; // 10MB
+export const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024; // 20MB
 
-/** Image-only MIME whitelist. */
+/** Image MIME whitelist. */
 export const ALLOWED_IMAGE_MIME = new Set([
   "image/jpeg",
   "image/png",
@@ -22,13 +22,28 @@ export const ALLOWED_IMAGE_MIME = new Set([
   "image/gif",
 ]);
 
-/** Image extension that maps to a whitelisted MIME type. */
+/** Compressed-archive MIME whitelist. */
+export const ALLOWED_ARCHIVE_MIME = new Set([
+  "application/zip",
+  "application/x-zip-compressed",
+  "application/x-rar-compressed",
+  "application/x-7z-compressed",
+  "application/gzip",
+  "application/x-tar",
+]);
+
+/** Extension that maps to a whitelisted MIME type (image or archive). */
 const EXT_TO_MIME: Record<string, string> = {
   jpg: "image/jpeg",
   jpeg: "image/jpeg",
   png: "image/png",
   webp: "image/webp",
   gif: "image/gif",
+  zip: "application/zip",
+  rar: "application/x-rar-compressed",
+  "7z": "application/x-7z-compressed",
+  gz: "application/gzip",
+  tar: "application/x-tar",
 };
 
 /** Replaces characters that are unsafe in an object key. */
@@ -40,14 +55,15 @@ export function sanitizeFilename(filename: string): string {
 const ATTACHMENT_PREFIX = "attachments";
 
 /**
- * Maps a client filename/type to a whitelisted MIME type, or returns null when
- * the file is not an allowed image. Used for server-side validation.
+ * Maps a client filename/type to a whitelisted MIME type (image or archive),
+ * or returns null when the file is not allowed. Used for server-side
+ * validation. (Name kept for compatibility — accepts archives too.)
  */
 export function resolveImageType(
   mime: string | undefined,
   filename: string,
 ): string | null {
-  if (mime && ALLOWED_IMAGE_MIME.has(mime)) {
+  if (mime && (ALLOWED_IMAGE_MIME.has(mime) || ALLOWED_ARCHIVE_MIME.has(mime))) {
     return mime;
   }
   const ext = filename.split(".").pop()?.toLowerCase() ?? "";

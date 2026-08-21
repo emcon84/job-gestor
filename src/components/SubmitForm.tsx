@@ -7,7 +7,10 @@ import type { ActionResult } from "@/lib/action-types";
 import { MAX_ATTACHMENT_BYTES, resolveImageType } from "@/lib/r2";
 import type { Attachment, ServiceOption } from "@/lib/domain";
 
-const ACCEPT = "image/jpeg,image/png,image/webp,image/gif";
+const ACCEPT =
+  "image/jpeg,image/png,image/webp,image/gif," +
+  "application/zip,application/x-zip-compressed,application/x-rar-compressed," +
+  "application/x-7z-compressed,application/gzip,application/x-tar";
 
 export default function SubmitForm({ services }: { services: ServiceOption[] }) {
   const router = useRouter();
@@ -28,7 +31,7 @@ export default function SubmitForm({ services }: { services: ServiceOption[] }) 
         continue;
       }
       if (!resolveImageType(f.type, f.name)) {
-        errors.push(`"${f.name}" no es una imagen permitida (JPG, PNG, WEBP, GIF).`);
+        errors.push(`"${f.name}" no es un archivo permitido (imagen o comprimido).`);
         continue;
       }
       ok.push(f);
@@ -234,7 +237,9 @@ export default function SubmitForm({ services }: { services: ServiceOption[] }) 
             ))}
           </ul>
         )}
-        <p className="mt-1 text-xs text-muted">Solo imágenes, máx 10MB cada una.</p>
+        <p className="mt-1 text-xs text-muted">
+          Imágenes o comprimidos (zip/rar/7z), máx 20MB cada uno.
+        </p>
       </div>
 
       <button
