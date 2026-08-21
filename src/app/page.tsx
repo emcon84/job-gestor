@@ -25,29 +25,25 @@ export default async function HomePage() {
         </p>
       </header>
 
-      <section className="mb-8 rounded-2xl border border-card-border bg-card p-5 space-y-2">
-        <h2 className="text-sm font-semibold text-primary">¿Qué es el Abono?</h2>
-        <p className="text-sm text-secondary">
-          El abono es el acuerdo de costo mensual por mantenimiento. No es
-          estricto: puede sobrepasarse si es necesario.
-        </p>
-        <p className="text-sm text-secondary">
-          En los meses donde no se realizan tareas no se cobra — solo se cobra
-          lo que se ve en este listado.
-        </p>
-      </section>
-
       <section className="mb-10">
         <h2 className="mb-3 text-lg font-semibold text-primary">Nueva tarea</h2>
         <SubmitForm services={services} />
       </section>
 
-      {tasks.length > 0 && (
-        <section className="mb-10">
-          <h2 className="mb-3 text-lg font-semibold text-primary">Tu abono</h2>
-          <ProgressBar summary={packSummary} />
-        </section>
-      )}
+      <section className="mb-10">
+        <h2 className="mb-3 text-lg font-semibold text-primary">Tu abono</h2>
+        <div className="mb-3 rounded-2xl border border-card-border bg-card p-5 space-y-2">
+          <p className="text-sm text-secondary">
+            El abono es el acuerdo de costo mensual por mantenimiento. No es
+            estricto: puede sobrepasarse si es necesario.
+          </p>
+          <p className="text-sm text-secondary">
+            En los meses donde no se realizan tareas no se cobra — solo se cobra
+            lo que se ve en este listado.
+          </p>
+        </div>
+        {tasks.length > 0 && <ProgressBar summary={packSummary} />}
+      </section>
 
       <section>
         <h2 className="mb-3 text-lg font-semibold text-primary">
