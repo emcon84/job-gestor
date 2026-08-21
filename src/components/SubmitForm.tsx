@@ -19,7 +19,7 @@ export default function SubmitForm({ services }: { services: ServiceOption[] }) 
     { kind: "idle", text: "" },
   );
   const [submitting, setSubmitting] = useState(false);
-  const [serviceId, setServiceId] = useState(services[0]?.id ?? "");
+  const [serviceId, setServiceId] = useState("");
 
   function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const selected = Array.from(e.target.files ?? []);
@@ -165,7 +165,7 @@ export default function SubmitForm({ services }: { services: ServiceOption[] }) 
 
       <div>
         <label htmlFor="serviceId" className="block text-sm font-medium text-primary">
-          Servicio *
+          Servicio (opcional)
         </label>
         <select
           id="serviceId"
@@ -174,7 +174,7 @@ export default function SubmitForm({ services }: { services: ServiceOption[] }) 
           onChange={(e) => setServiceId(e.target.value)}
           className="mt-1 w-full rounded-lg border border-card-border bg-surface px-3 py-2 text-primary text-base focus:border-accent focus:outline-none"
         >
-          {services.length === 0 && <option value="">Sin servicios disponibles</option>}
+          <option value="">Sin clasificar</option>
           {services.map((s) => (
             <option key={s.id} value={s.id}>
               {s.name}
@@ -182,7 +182,7 @@ export default function SubmitForm({ services }: { services: ServiceOption[] }) 
           ))}
         </select>
         <p className="mt-1 text-xs text-muted">
-          Elegí el servicio que mejor describa la tarea.
+          Opcional: elegí el servicio si lo conocés; lo clasificamos nosotros.
         </p>
       </div>
 

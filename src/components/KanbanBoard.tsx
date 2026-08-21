@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { updateTask } from "@/app/actions";
-import { PRIORITY_LABELS, type Task, type TaskStatus } from "@/lib/domain";
+import { PRIORITY_LABELS, type ServiceOption, type Task, type TaskStatus } from "@/lib/domain";
 import { formatArs } from "@/lib/format";
 import AttachmentThumbs from "@/components/AttachmentThumbs";
 import TaskDetailModal from "@/components/TaskDetailModal";
@@ -24,8 +24,10 @@ const COLUMN_ACCENT: Record<TaskStatus, string> = {
 
 export default function KanbanBoard({
   columns,
+  services,
 }: {
   columns: Record<TaskStatus, Task[]>;
+  services: ServiceOption[];
 }) {
   const [selected, setSelected] = useState<Task | null>(null);
 
@@ -62,7 +64,11 @@ export default function KanbanBoard({
       </div>
 
       {selected && (
-        <TaskDetailModal task={selected} onClose={() => setSelected(null)} />
+        <TaskDetailModal
+          task={selected}
+          services={services}
+          onClose={() => setSelected(null)}
+        />
       )}
     </>
   );
@@ -139,6 +145,12 @@ function KanbanCard({ task, onOpen }: { task: Task; onOpen: () => void }) {
         <p className="text-[10px] uppercase tracking-wide text-muted">
           {STATUS_VALUE[task.status]} · {PRIORITY_LABELS[task.priority]}
         </p>
+
+        {task.serviceId === null && (
+          <span className="inline-flex items-center rounded-full border border-amber-500/40 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-500">
+            Sin clasificar
+          </span>
+        )}
       </div>
 
       {/* Move status (fast path, kept on the card). */}

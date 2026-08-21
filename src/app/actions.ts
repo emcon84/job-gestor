@@ -65,17 +65,19 @@ export async function getUploadUrlAction(
 }
 
 /**
- * Creates a task. Client submits title/description/area/priority, an assigned
- * catalog `serviceId`, plus a JSON array of already-uploaded attachment records
- * (name, url, contentType, sizeBytes). The task amount is auto-filled from the
- * service default (server-resolved, authoritative); the owner may edit it later.
+ * Creates a task. Client submits title/description/area/priority, an optional
+ * catalog `serviceId` (null = unclassified, the owner classifies later), plus a
+ * JSON array of already-uploaded attachment records (name, url, contentType,
+ * sizeBytes). The task amount is auto-filled from the service default when one
+ * is assigned (server-resolved, authoritative); the owner may edit it later.
  */
 export async function createTask(formData: FormData): Promise<ActionResult> {
   const title = (formData.get("title") as string | null)?.trim() ?? "";
   const description = (formData.get("description") as string | null)?.trim() ?? "";
   const area = (formData.get("area") as string | null)?.trim() ?? "";
   const priority = (formData.get("priority") as string | null) ?? "medium";
-  const serviceId = (formData.get("serviceId") as string | null) ?? "";
+  const serviceId =
+    (formData.get("serviceId") as string | null)?.trim() || null;
   const attachmentsRaw = (formData.get("attachments") as string | null) ?? "[]";
 
   if (!title) {
@@ -86,9 +88,6 @@ export async function createTask(formData: FormData): Promise<ActionResult> {
   }
   if (!area) {
     return { ok: false, error: "El área o sistema es obligatorio." };
-  }
-  if (!serviceId) {
-    return { ok: false, error: "Seleccioná un servicio." };
   }
   const validPriority: Priority = PRIORITIES.includes(priority as Priority)
     ? (priority as Priority)
@@ -121,8 +120,9 @@ export async function createTask(formData: FormData): Promise<ActionResult> {
   }
 
   const repo = await getRepository();
-  // The service must exist in the catalog (server-resolved, authoritative).
-  if ((await repo.resolveServiceCost(serviceId)) === null) {
+  // When a service was chosen, it must exist in the catalog (server-resolved,
+  // authoritative). Unclassified tasks (null) skip this check.
+  if (serviceId && (await repo.resolveServiceCost(serviceId)) === null) {
     return { ok: false, error: "El servicio seleccionado no existe." };
   }
   await repo.createTask({
@@ -215,6 +215,7 @@ export async function updateTask(formData: FormData): Promise<ActionResult> {
   const amountRaw = formData.get("amountArs") as string | null;
   const paymentRaw = formData.get("paymentState") as string | null;
   const dueDateRaw = formData.get("paymentDueDate") as string | null;
+  const serviceRaw = formData.get("serviceId") as string | null;
 
   if (statusRaw && !isStatus(statusRaw)) {
     return { ok: false, error: "Estado inválido." };
@@ -245,11 +246,25 @@ export async function updateTask(formData: FormData): Promise<ActionResult> {
   }
 
   const repo = await getRepository();
+
+  // Optional service classification: empty string -> null (unclassified);
+  // otherwise must be a valid catalog service.
+  let serviceId: string | null | undefined;
+  if (serviceRaw !== null && serviceRaw !== undefined && serviceRaw.trim() !== "") {
+    serviceId = serviceRaw.trim();
+    if ((await repo.resolveServiceCost(serviceId)) === null) {
+      return { ok: false, error: "Servicio inválido." };
+    }
+  } else if (serviceRaw !== null && serviceRaw !== undefined) {
+    serviceId = null;
+  }
+
   const updated = await repo.updateTask(id, {
     status: statusRaw ? (statusRaw as TaskStatus) : undefined,
     amountArs: amountArs ?? undefined,
     paymentState: paymentRaw ? (paymentRaw as PaymentState) : undefined,
     paymentDueDate,
+    serviceId,
   });
 
   if (!updated) {

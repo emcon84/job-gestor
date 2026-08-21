@@ -149,8 +149,8 @@ export interface Task {
   paymentState: PaymentState | null;
   /** Optional date by which the payment is due (null = no due date). */
   paymentDueDate: Date | null;
-  /** The catalog service this task is assigned to. */
-  serviceId: string;
+  /** The catalog service this task is assigned to (null = unclassified). */
+  serviceId: string | null;
   createdAt: Date;
   updatedAt: Date;
   completedAt: Date | null;
@@ -165,8 +165,8 @@ export interface NewTask {
   description: string;
   area: string;
   priority: Priority;
-  /** Catalog service assigned by the client on submit. */
-  serviceId: string;
+  /** Catalog service assigned by the client on submit (null = unclassified). */
+  serviceId: string | null;
   attachments: Attachment[];
 }
 
@@ -179,6 +179,8 @@ export interface TaskUpdate {
   paymentState?: PaymentState | null;
   /** Optional payment due date. `null` clears an existing value. */
   paymentDueDate?: Date | null;
+  /** Catalog service assignment. `null` clears it (unclassified). */
+  serviceId?: string | null;
 }
 
 export type KanbanColumns = Record<TaskStatus, Task[]>;

@@ -1,0 +1,1 @@
+ALTER TABLE "tasks" ALTER COLUMN "service_id" DROP NOT NULL;

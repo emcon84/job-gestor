@@ -41,6 +41,50 @@ describe("MemoryRepository", () => {
     expect(task.amountArs).toBe(0);
   });
 
+  it("creates an unclassified task (null service) with a zero amount", async () => {
+    const task = await repo.createTask(sampleTask({ serviceId: null }));
+    expect(task.serviceId).toBeNull();
+    expect(task.amountArs).toBe(0);
+  });
+
+  it("creates a task with a service and resolves its default cost", async () => {
+    const svc = await repo.createService({ name: "dev web", defaultCostArs: 90_000_00 });
+    const task = await repo.createTask(sampleTask({ serviceId: svc.id }));
+    expect(task.serviceId).toBe(svc.id);
+    expect(task.amountArs).toBe(90_000_00);
+  });
+
+  it("updateTask sets a service and auto-fills the default cost on a zero-amount task", async () => {
+    const svc = await repo.createService({ name: "soporte", defaultCostArs: 70_000_00 });
+    const task = await repo.createTask(sampleTask({ serviceId: null }));
+    expect(task.amountArs).toBe(0);
+
+    const updated = await repo.updateTask(task.id, { serviceId: svc.id });
+    expect(updated?.serviceId).toBe(svc.id);
+    expect(updated?.amountArs).toBe(70_000_00);
+  });
+
+  it("updateTask does not auto-fill when the task already has a nonzero amount", async () => {
+    const svc = await repo.createService({ name: "soporte", defaultCostArs: 70_000_00 });
+    const task = await repo.createTask(sampleTask({ serviceId: null }));
+    const withAmount = await repo.updateTask(task.id, { amountArs: 10_000_00 });
+    expect(withAmount?.amountArs).toBe(10_000_00);
+
+    const updated = await repo.updateTask(task.id, { serviceId: svc.id });
+    expect(updated?.serviceId).toBe(svc.id);
+    expect(updated?.amountArs).toBe(10_000_00);
+  });
+
+  it("updateTask clears a service back to null (unclassified)", async () => {
+    const task = await repo.createTask(sampleTask());
+    expect(task.serviceId).toBe(sampleTask.defaultServiceId);
+
+    const cleared = await repo.updateTask(task.id, { serviceId: null });
+    expect(cleared?.serviceId).toBeNull();
+    // Clearing does not touch the amount.
+    expect(cleared?.amountArs).toBe(50_000_00);
+  });
+
   it("stores attachments on create", async () => {
     const task = await repo.createTask(
       sampleTask({

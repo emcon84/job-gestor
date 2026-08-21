@@ -58,7 +58,7 @@ export interface ServiceRepository {
   /** Deletes a service from the catalog. Returns false if it is referenced by tasks. */
   deleteService(id: string): Promise<boolean>;
   /** Resolves the default cost (cents) for a service, or null if it doesn't exist. */
-  resolveServiceCost(id: string): Promise<number | null>;
+  resolveServiceCost(id: string | null): Promise<number | null>;
 }
 
 /** Combined repository contract used by server actions and pages. */

@@ -78,7 +78,7 @@ export default async function OwnerPage() {
         <ServiceAdmin services={services} />
       </section>
 
-      <KanbanBoard columns={columns} />
+      <KanbanBoard columns={columns} services={services} />
     </main>
   );
 }

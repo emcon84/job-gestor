@@ -78,6 +78,18 @@ export class MemoryRepository implements TaskRepository, ServiceRepository {
       return null;
     }
     const status = update.status ?? existing.status;
+    // Auto-fill: assigning a service to a task whose amount is still zero
+    // populates the service default cost (mirrors createTask behavior).
+    let amountArs =
+      update.amountArs !== undefined ? update.amountArs : existing.amountArs;
+    if (
+      update.serviceId !== undefined &&
+      update.serviceId &&
+      existing.amountArs === 0 &&
+      (update.amountArs === undefined || update.amountArs === 0)
+    ) {
+      amountArs = (await this.resolveServiceCost(update.serviceId)) ?? 0;
+    }
     const updated: Task = {
       ...existing,
       status,
@@ -85,8 +97,7 @@ export class MemoryRepository implements TaskRepository, ServiceRepository {
         update.clientMoveCount !== undefined
           ? update.clientMoveCount
           : existing.clientMoveCount,
-      amountArs:
-        update.amountArs !== undefined ? update.amountArs : existing.amountArs,
+      amountArs,
       paymentState:
         update.paymentState !== undefined
           ? update.paymentState
@@ -95,6 +106,8 @@ export class MemoryRepository implements TaskRepository, ServiceRepository {
         update.paymentDueDate !== undefined
           ? update.paymentDueDate
           : existing.paymentDueDate,
+      serviceId:
+        update.serviceId !== undefined ? update.serviceId : existing.serviceId,
       completedAt: resolveCompletedAt(status, new Date(), existing.completedAt),
       updatedAt: new Date(),
     };
@@ -188,7 +201,10 @@ export class MemoryRepository implements TaskRepository, ServiceRepository {
     return this.services.delete(id);
   }
 
-  async resolveServiceCost(id: string): Promise<number | null> {
+  async resolveServiceCost(id: string | null): Promise<number | null> {
+    if (!id) {
+      return null;
+    }
     return this.services.get(id)?.defaultCostArs ?? null;
   }
 

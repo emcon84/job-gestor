@@ -175,7 +175,8 @@ export class PostgresRepository implements TaskRepository, ServiceRepository {
           area: input.area,
           priority: input.priority,
           serviceId: input.serviceId,
-          // Resolve the cost from the assigned service default (authoritative).
+          // Resolve the cost from the assigned service default (authoritative);
+          // unclassified tasks start at 0.
           amountArs: (await this.resolveServiceCost(input.serviceId)) ?? 0,
         })
         .returning();
@@ -218,6 +219,19 @@ export class PostgresRepository implements TaskRepository, ServiceRepository {
     const status = update.status ?? existing.status;
     const completedAt = resolveCompletedAt(status, new Date(), existing.completedAt);
 
+    // Auto-fill: assigning a service to a task whose amount is still zero
+    // populates the service default cost (mirrors createTask behavior).
+    let amountArs =
+      update.amountArs !== undefined ? update.amountArs : existing.amountArs;
+    if (
+      update.serviceId !== undefined &&
+      update.serviceId &&
+      existing.amountArs === 0 &&
+      (update.amountArs === undefined || update.amountArs === 0)
+    ) {
+      amountArs = (await this.resolveServiceCost(update.serviceId)) ?? 0;
+    }
+
     const [updated] = await db
       .update(tasks)
       .set({
@@ -226,8 +240,7 @@ export class PostgresRepository implements TaskRepository, ServiceRepository {
           update.clientMoveCount !== undefined
             ? update.clientMoveCount
             : existing.clientMoveCount,
-        amountArs:
-          update.amountArs !== undefined ? update.amountArs : existing.amountArs,
+        amountArs,
         paymentState:
           update.paymentState !== undefined
             ? update.paymentState
@@ -236,6 +249,8 @@ export class PostgresRepository implements TaskRepository, ServiceRepository {
           update.paymentDueDate !== undefined
             ? update.paymentDueDate
             : existing.paymentDueDate,
+        serviceId:
+          update.serviceId !== undefined ? update.serviceId : existing.serviceId,
         completedAt,
         updatedAt: new Date(),
       })
@@ -348,7 +363,10 @@ export class PostgresRepository implements TaskRepository, ServiceRepository {
     return Boolean(row);
   }
 
-  async resolveServiceCost(id: string): Promise<number | null> {
+  async resolveServiceCost(id: string | null): Promise<number | null> {
+    if (!id) {
+      return null;
+    }
     const [row] = await db
       .select({ defaultCostArs: services.defaultCostArs })
       .from(services)

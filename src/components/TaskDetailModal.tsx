@@ -6,6 +6,7 @@ import { X } from "lucide-react";
 import { deleteTask, updateTask } from "@/app/actions";
 import {
   PRIORITY_LABELS,
+  type ServiceOption,
   type Task,
   type TaskStatus,
 } from "@/lib/domain";
@@ -28,9 +29,11 @@ import {
  */
 export default function TaskDetailModal({
   task,
+  services,
   onClose,
 }: {
   task: Task;
+  services: ServiceOption[];
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -41,6 +44,7 @@ export default function TaskDetailModal({
   const amountRef = useRef<HTMLInputElement>(null);
   const paymentRef = useRef<HTMLSelectElement>(null);
   const dueDateRef = useRef<HTMLInputElement>(null);
+  const serviceRef = useRef<HTMLSelectElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -77,6 +81,7 @@ export default function TaskDetailModal({
     fd.set("amountArs", amountRef.current?.value ?? "");
     fd.set("paymentState", paymentRef.current?.value ?? "");
     fd.set("paymentDueDate", dueDateRef.current?.value ?? "");
+    fd.set("serviceId", serviceRef.current?.value ?? "");
     const r = await updateTask(fd);
     setMsg(
       r.ok
@@ -124,6 +129,11 @@ export default function TaskDetailModal({
               <span className={`font-medium ${STATUS_COLOR[task.status]}`}>
                 {STATUS_VALUE[task.status]}
               </span>
+              {task.serviceId === null && (
+                <span className="rounded-full border border-amber-500/40 px-2 py-0.5 font-medium uppercase tracking-wide text-amber-500">
+                  Sin clasificar
+                </span>
+              )}
             </div>
           </div>
           <button
@@ -161,6 +171,27 @@ export default function TaskDetailModal({
 
           <section className="space-y-2">
             <h3 className="text-sm font-semibold text-primary">Monto y pago</h3>
+            <div>
+              <label
+                htmlFor="task-service"
+                className="mb-1 block text-xs text-muted"
+              >
+                Servicio
+              </label>
+              <select
+                id="task-service"
+                ref={serviceRef}
+                defaultValue={task.serviceId ?? ""}
+                className="w-full rounded-lg border border-card-border bg-surface px-2 py-2 text-sm text-primary"
+              >
+                <option value="">Sin clasificar</option>
+                {services.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="grid grid-cols-2 gap-2">
               <input
                 ref={amountRef}
