@@ -13,6 +13,8 @@ import { centsToPesosInput } from "@/lib/format";
  */
 export default function ServiceAdmin({ services }: { services: ServiceOption[] }) {
   const router = useRouter();
+  // Collapsed by default so the catalog never pushes the kanban off-screen.
+  const [collapsed, setCollapsed] = useState(true);
   const [name, setName] = useState("");
   const [cost, setCost] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -64,16 +66,37 @@ export default function ServiceAdmin({ services }: { services: ServiceOption[] }
   }
 
   return (
-    <div className="rounded-2xl border border-card-border bg-card p-5 space-y-4">
-      <h2 className="text-lg font-semibold text-primary">Catálogo de servicios</h2>
-      <p className="text-xs text-muted">
-        Cada servicio tiene un costo fijo que se aplica automáticamente a las
-        tareas que lo eligen. Podés ajustar el costo por tarea después.
-      </p>
+    <div className="rounded-2xl border border-card-border bg-card p-5">
+      <button
+        type="button"
+        onClick={() => setCollapsed((c) => !c)}
+        aria-expanded={!collapsed}
+        className="flex w-full items-center justify-between gap-3"
+      >
+        <h2 className="text-left text-lg font-semibold text-primary">
+          Catálogo de servicios
+          <span className="ml-2 text-xs font-normal text-muted">
+            ({services.length})
+          </span>
+        </h2>
+        <span
+          aria-hidden
+          className={`text-muted transition-transform duration-200 ${collapsed ? "" : "rotate-180"}`}
+        >
+          ▾
+        </span>
+      </button>
 
-      {services.length === 0 ? (
-        <p className="text-sm text-muted">Todavía no hay servicios.</p>
-      ) : (
+      {!collapsed && (
+        <div className="mt-4 space-y-4">
+          <p className="text-xs text-muted">
+            Cada servicio tiene un costo fijo que se aplica automáticamente a las
+            tareas que lo eligen. Podés ajustar el costo por tarea después.
+          </p>
+
+          {services.length === 0 ? (
+            <p className="text-sm text-muted">Todavía no hay servicios.</p>
+          ) : (
         <ul className="space-y-2">
           {services.map((s) => (
             <li
@@ -169,6 +192,8 @@ export default function ServiceAdmin({ services }: { services: ServiceOption[] }
         >
           {msg.text}
         </p>
+      )}
+        </div>
       )}
     </div>
   );
