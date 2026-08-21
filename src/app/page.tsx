@@ -58,6 +58,15 @@ export default async function HomePage() {
         </h2>
         <TaskList tasks={tasks} />
       </section>
+
+      <footer className="mt-10 border-t border-card-border pt-4 text-center">
+        <a
+          href="/owner"
+          className="text-xs text-muted transition-colors hover:text-primary"
+        >
+          Acceso del propietario
+        </a>
+      </footer>
     </main>
   );
 }
