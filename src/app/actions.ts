@@ -175,7 +175,8 @@ export async function unlockOwner(
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    maxAge: 60 * 60 * 24 * 7, // 7 days
+    // Session cookie (no maxAge): expires when the browser closes, so the
+    // owner is asked for the passphrase again on the next visit.
   });
 
   revalidatePath("/");
