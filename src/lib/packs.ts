@@ -19,6 +19,8 @@ export interface PackSummary {
   currentPack: number;
   /** Amount accumulated in the current pack (includes carried overflow). Range [0, threshold). */
   packAccumulatedCents: number;
+  /** Unpaid portion of the current pack — what the client still owes toward the next close. */
+  pendingPackCents: number;
   /** Amount that rolled over into the current pack when the previous one closed. */
   overflowCents: number;
   /** Number of packs already closed. */
@@ -60,9 +62,30 @@ export function computePacks(
     }
   }
 
+  // The current (partial) pack is the tail of the chronological total: the
+  // most recent portions that sum to `accumulated`. Walk it backwards and sum
+  // only the UNPAID portions — paid tasks subtract from what the client owes.
+  let pendingPackCents = 0;
+  let remaining = accumulated;
+  for (const task of [...ordered].reverse()) {
+    if (remaining <= 0) {
+      break;
+    }
+    const amount = task.amountArs ?? 0;
+    if (amount <= 0) {
+      continue;
+    }
+    const portion = Math.min(amount, remaining);
+    if (task.paymentState !== "paid") {
+      pendingPackCents += portion;
+    }
+    remaining -= portion;
+  }
+
   return {
     currentPack: closedPacks + 1,
     packAccumulatedCents: accumulated,
+    pendingPackCents,
     overflowCents: currentPackStart,
     closedPacks,
   };

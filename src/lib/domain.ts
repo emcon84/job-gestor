@@ -43,6 +43,8 @@ export interface Comment {
   taskId: string;
   body: string;
   author: CommentAuthor;
+  /** Display name of the author. Nullable for legacy rows created before this field existed. */
+  authorName: string | null;
   createdAt: Date;
 }
 
@@ -51,10 +53,14 @@ export interface NewComment {
   taskId: string;
   body: string;
   author: CommentAuthor;
+  authorName?: string | null;
 }
 
 /** Maximum length of a comment body, enforced on the server. */
 export const COMMENT_MAX_LENGTH = 2000;
+
+/** Maximum length of a comment author name, enforced on the server. */
+export const COMMENT_AUTHOR_NAME_MAX_LENGTH = 60;
 
 /**
  * Validates a comment body. Returns an error message, or null when valid.
@@ -67,6 +73,18 @@ export function validateCommentBody(body: string): string | null {
   }
   if (trimmed.length > COMMENT_MAX_LENGTH) {
     return `El comentario es demasiado largo (máx. ${COMMENT_MAX_LENGTH} caracteres).`;
+  }
+  return null;
+}
+
+/**
+ * Validates a client-submitted author name. Empty is allowed (the caller falls
+ * back to a default label). Returns an error message, or null when valid.
+ * The caller is expected to have already trimmed the input.
+ */
+export function validateCommentAuthorName(name: string): string | null {
+  if (name.length > COMMENT_AUTHOR_NAME_MAX_LENGTH) {
+    return `El nombre es demasiado largo (máx. ${COMMENT_AUTHOR_NAME_MAX_LENGTH} caracteres).`;
   }
   return null;
 }

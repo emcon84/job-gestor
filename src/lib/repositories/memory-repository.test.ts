@@ -126,17 +126,35 @@ describe("MemoryRepository comments", () => {
 
   it("adds a comment and lists it oldest first for the task", async () => {
     const task = await repo.createTask(sampleTask());
-    await repo.addComment({ taskId: task.id, body: "primero", author: "client" });
-    await repo.addComment({ taskId: task.id, body: "segundo", author: "owner" });
+    await repo.addComment({ taskId: task.id, body: "primero", author: "client", authorName: "Ana" });
+    await repo.addComment({ taskId: task.id, body: "segundo", author: "owner", authorName: "Propietario" });
 
     const comments = await repo.listCommentsByTask(task.id);
     expect(comments).toHaveLength(2);
     expect(comments[0].body).toBe("primero");
     expect(comments[0].author).toBe("client");
+    expect(comments[0].authorName).toBe("Ana");
     expect(comments[1].body).toBe("segundo");
     expect(comments[1].author).toBe("owner");
+    expect(comments[1].authorName).toBe("Propietario");
     expect(comments[0].id).toBeTruthy();
     expect(comments[0].createdAt).toBeInstanceOf(Date);
+  });
+
+  it("round-trips a comment author name through the thread", async () => {
+    const task = await repo.createTask(sampleTask());
+    await repo.addComment({ taskId: task.id, body: "hola", author: "client", authorName: "María" });
+    const [withTask] = await repo.listTasks();
+    expect(withTask.comments[0].authorName).toBe("María");
+    const comments = await repo.listCommentsByTask(task.id);
+    expect(comments[0].authorName).toBe("María");
+  });
+
+  it("defaults author name to null when not provided", async () => {
+    const task = await repo.createTask(sampleTask());
+    await repo.addComment({ taskId: task.id, body: "sin nombre", author: "client" });
+    const comments = await repo.listCommentsByTask(task.id);
+    expect(comments[0].authorName).toBeNull();
   });
 
   it("returns comments attached to tasks loaded via listTasks", async () => {

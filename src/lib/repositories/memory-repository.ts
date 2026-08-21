@@ -116,6 +116,7 @@ export class MemoryRepository implements TaskRepository, ServiceRepository {
       taskId: input.taskId,
       body: input.body,
       author: input.author,
+      authorName: input.authorName ?? null,
       createdAt: new Date(),
     };
     const list = this.comments.get(input.taskId) ?? [];

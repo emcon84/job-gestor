@@ -13,7 +13,12 @@ import type {
   ServiceOption,
   TaskStatus,
 } from "@/lib/domain";
-import { PRIORITIES, STATUSES, validateCommentBody } from "@/lib/domain";
+import {
+  PRIORITIES,
+  STATUSES,
+  validateCommentAuthorName,
+  validateCommentBody,
+} from "@/lib/domain";
 import { parsePesosToCents } from "@/lib/format";
 import { getRepository } from "@/lib/store";
 import type { ActionResult, UnlockState, UploadUrlResult } from "@/lib/action-types";
@@ -239,11 +244,13 @@ export async function updateTask(formData: FormData): Promise<ActionResult> {
 /**
  * Adds a comment to a task thread. Works for BOTH the owner (unlocked cookie)
  * and the client portal (shared link, no auth). The author is derived from the
- * owner cookie, so a portal visitor posting is the normal client flow.
+ * owner cookie, so a portal visitor posting is the normal client flow. Clients
+ * provide their own display name; the owner is always shown as "Propietario".
  */
 export async function addComment(formData: FormData): Promise<ActionResult> {
   const taskId = (formData.get("taskId") as string | null)?.trim() ?? "";
   const body = (formData.get("body") as string | null)?.trim() ?? "";
+  const authorName = (formData.get("authorName") as string | null)?.trim() ?? "";
 
   if (!taskId) {
     return { ok: false, error: "Falta la tarea." };
@@ -253,10 +260,23 @@ export async function addComment(formData: FormData): Promise<ActionResult> {
     return { ok: false, error: bodyError };
   }
 
-  const author: CommentAuthor = (await isOwner()) ? "owner" : "client";
+  let author: CommentAuthor;
+  let name: string;
+  if (await isOwner()) {
+    // Owner comments never trust a client-submitted name.
+    author = "owner";
+    name = "Propietario";
+  } else {
+    const nameError = validateCommentAuthorName(authorName);
+    if (nameError) {
+      return { ok: false, error: nameError };
+    }
+    author = "client";
+    name = authorName || "Cliente";
+  }
 
   const repo = await getRepository();
-  const created = await repo.addComment({ taskId, body, author });
+  const created = await repo.addComment({ taskId, body, author, authorName: name });
   if (!created) {
     return { ok: false, error: "No se encontró la tarea." };
   }

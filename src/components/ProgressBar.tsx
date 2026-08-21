@@ -3,21 +3,20 @@ import { PACK_THRESHOLD_ARS_CENTS } from "@/lib/packs";
 import { formatArs } from "@/lib/format";
 
 /**
- * Progress toward the next 150.000 ARS pack close.
- *
- * `summary.packAccumulatedCents` includes any carried overflow, so the bar fills
- * from 0 to the threshold. Shows the accumulated total and how many packs have
- * already closed.
+ * Progress toward the next 150.000 ARS pack close, based on what the client
+ * still OWES (pendingPackCents). Paid tasks subtract from the bar — the client
+ * may pay tasks individually, so the bar shows the remaining debt, not the raw
+ * accumulated total.
  */
 export default function ProgressBar({ summary }: { summary: PackSummary }) {
-  const accumulated = summary.packAccumulatedCents;
-  const pct = Math.min(100, Math.max(0, (accumulated / PACK_THRESHOLD_ARS_CENTS) * 100));
+  const pending = summary.pendingPackCents;
+  const pct = Math.min(100, Math.max(0, (pending / PACK_THRESHOLD_ARS_CENTS) * 100));
 
   return (
     <div className="rounded-2xl border border-card-border bg-card p-5 space-y-2">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold text-primary">
-          Abono hacia el próximo pack
+          Pendiente de pago del abono
         </h2>
         <span className="text-xs text-muted">
           Pack {summary.currentPack}
@@ -29,7 +28,7 @@ export default function ProgressBar({ summary }: { summary: PackSummary }) {
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={PACK_THRESHOLD_ARS_CENTS}
-        aria-valuenow={Math.round(accumulated)}
+        aria-valuenow={Math.round(pending)}
         className="h-3 w-full overflow-hidden rounded-full bg-surface"
       >
         <div
@@ -39,7 +38,7 @@ export default function ProgressBar({ summary }: { summary: PackSummary }) {
       </div>
 
       <div className="flex items-center justify-between text-xs text-secondary">
-        <span className="font-medium text-primary">{formatArs(accumulated)}</span>
+        <span className="font-medium text-primary">{formatArs(pending)}</span>
         <span>de {formatArs(PACK_THRESHOLD_ARS_CENTS)}</span>
       </div>
 

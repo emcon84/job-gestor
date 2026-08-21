@@ -59,6 +59,7 @@ function mapComment(row: CommentRow): Comment {
     taskId: row.taskId,
     body: row.body,
     author: row.author as CommentAuthor,
+    authorName: row.authorName,
     createdAt: row.createdAt,
   };
 }
@@ -245,6 +246,7 @@ export class PostgresRepository implements TaskRepository, ServiceRepository {
         taskId: input.taskId,
         body: input.body,
         author: input.author,
+        authorName: input.authorName ?? null,
       })
       .returning();
     return mapComment(row);

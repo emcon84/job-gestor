@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   groupByStatus,
   resolveCompletedAt,
+  validateCommentAuthorName,
   validateCommentBody,
   type Task,
 } from "./domain";
@@ -93,5 +94,24 @@ describe("validateCommentBody", () => {
 
   it("accepts a body exactly at the max length", () => {
     expect(validateCommentBody("a".repeat(2000))).toBeNull();
+  });
+});
+
+describe("validateCommentAuthorName", () => {
+  it("accepts a name within the max length", () => {
+    expect(validateCommentAuthorName("Juan")).toBeNull();
+  });
+
+  it("accepts an empty name (caller falls back to a default label)", () => {
+    expect(validateCommentAuthorName("")).toBeNull();
+  });
+
+  it("rejects a name over the max length", () => {
+    const long = "a".repeat(61);
+    expect(validateCommentAuthorName(long)).toContain("demasiado largo");
+  });
+
+  it("accepts a name exactly at the max length", () => {
+    expect(validateCommentAuthorName("a".repeat(60))).toBeNull();
   });
 });

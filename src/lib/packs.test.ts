@@ -132,4 +132,60 @@ describe("computePacks", () => {
     expect(s.packAccumulatedCents).toBe(100_000_00);
     expect(s.closedPacks).toBe(0);
   });
+
+  it("pending equals the full current pack when nothing is paid", () => {
+    const tasks = [
+      makeTask({ id: "a", amountArs: 80_000_00, createdAt: new Date("2026-01-01") }),
+      makeTask({ id: "b", amountArs: 40_000_00, createdAt: new Date("2026-01-02") }),
+    ];
+    const s = computePacks(tasks);
+    expect(s.packAccumulatedCents).toBe(120_000_00);
+    expect(s.pendingPackCents).toBe(120_000_00);
+  });
+
+  it("paid tasks subtract from the pending bar", () => {
+    const tasks = [
+      makeTask({ id: "a", amountArs: 80_000_00, createdAt: new Date("2026-01-01") }),
+      makeTask({
+        id: "b",
+        amountArs: 40_000_00,
+        createdAt: new Date("2026-01-02"),
+        paymentState: "paid",
+      }),
+    ];
+    const s = computePacks(tasks);
+    // Accumulated is still 120k, but only task a is unpaid.
+    expect(s.packAccumulatedCents).toBe(120_000_00);
+    expect(s.pendingPackCents).toBe(80_000_00);
+  });
+
+  it("unpaid overflow carries into the next pack's pending", () => {
+    const tasks = [
+      makeTask({ id: "a", amountArs: 140_000_00, createdAt: new Date("2026-01-01") }),
+      makeTask({ id: "b", amountArs: 30_000_00, createdAt: new Date("2026-01-02") }),
+    ];
+    const s = computePacks(tasks);
+    // 170k -> pack1 closes, 20k overflow starts pack2; task b (30k) is unpaid,
+    // so 10k went to the closed pack and 20k remain pending in pack 2.
+    expect(s.closedPacks).toBe(1);
+    expect(s.packAccumulatedCents).toBe(20_000_00);
+    expect(s.pendingPackCents).toBe(20_000_00);
+  });
+
+  it("paid task that crosses the threshold only subtracts its current-pack portion", () => {
+    const tasks = [
+      makeTask({ id: "a", amountArs: 140_000_00, createdAt: new Date("2026-01-01") }),
+      makeTask({
+        id: "b",
+        amountArs: 30_000_00,
+        createdAt: new Date("2026-01-02"),
+        paymentState: "paid",
+      }),
+    ];
+    const s = computePacks(tasks);
+    // Task b is paid: 10k of it closed pack 1 (irrelevant), 20k overflow is
+    // paid too, so nothing remains pending in pack 2.
+    expect(s.packAccumulatedCents).toBe(20_000_00);
+    expect(s.pendingPackCents).toBe(0);
+  });
 });

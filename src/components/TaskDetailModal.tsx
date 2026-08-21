@@ -241,7 +241,7 @@ export default function TaskDetailModal({
             <h3 className="mb-2 text-sm font-semibold text-primary">
               Comentarios
             </h3>
-            <CommentThread taskId={task.id} comments={task.comments} />
+            <CommentThread taskId={task.id} comments={task.comments} mode="owner" />
           </section>
 
           {msg && (

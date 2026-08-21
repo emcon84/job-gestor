@@ -72,6 +72,9 @@ export const comments = pgTable("comments", {
     .references(() => tasks.id, { onDelete: "cascade" }),
   body: text("body").notNull(),
   author: text("author", { enum: ["client", "owner"] }).notNull(),
+  // Client-provided display name. Nullable so pre-existing rows stay valid;
+  // the UI falls back to "Cliente"/"Propietario" when absent.
+  authorName: text("author_name"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

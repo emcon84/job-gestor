@@ -10,6 +10,7 @@ import {
 import { formatArs } from "@/lib/format";
 import AttachmentThumbs from "@/components/AttachmentThumbs";
 import CommentThread from "@/components/CommentThread";
+import PaymentBadge from "@/components/PaymentBadge";
 
 const STATUS_COLOR: Record<Task["status"], string> = {
   pending: "text-status-pending",
@@ -20,9 +21,10 @@ const STATUS_COLOR: Record<Task["status"], string> = {
 
 /**
  * Portal task list item (client). Renders the item markup passed by the server
- * TaskList plus a "Ver detalle" affordance, and a centered modal with the
- * description, images, payment/status summary, and the comment thread so
- * clients can post comments/responses. No edit controls on the client.
+ * TaskList plus the comment thread inline on the card (social-network style, so
+ * clients see and reply without opening anything) and a "Ver detalle"
+ * affordance that opens a modal with the description and images only. No edit
+ * controls on the client.
  */
 export default function PortalTaskItem({
   task,
@@ -37,6 +39,7 @@ export default function PortalTaskItem({
     <>
       <li className="space-y-3 rounded-2xl border border-card-border bg-card p-5">
         {children}
+        <CommentThread taskId={task.id} comments={task.comments} mode="portal" />
         <button
           type="button"
           onClick={() => setOpen(true)}
@@ -102,11 +105,7 @@ function PortalTaskDetailModal({
               <span className="font-medium text-primary">
                 {formatArs(task.amountArs)}
               </span>
-              {task.paymentState && (
-                <span className="text-muted">
-                  Pago: {task.paymentState === "paid" ? "pagado" : "pendiente"}
-                </span>
-              )}
+              <PaymentBadge state={task.paymentState} />
             </div>
           </div>
           <button
@@ -141,13 +140,6 @@ function PortalTaskDetailModal({
               />
             </section>
           )}
-
-          <section>
-            <h3 className="mb-2 text-sm font-semibold text-primary">
-              Comentarios
-            </h3>
-            <CommentThread taskId={task.id} comments={task.comments} />
-          </section>
         </div>
       </div>
     </div>
