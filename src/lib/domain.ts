@@ -7,7 +7,7 @@
  */
 
 export type Priority = "low" | "medium" | "high" | "urgent";
-export type TaskStatus = "pending" | "in_progress" | "done";
+export type TaskStatus = "pending" | "in_progress" | "revision" | "done";
 export type PaymentState = "paid" | "pending";
 
 export const PRIORITY_LABELS: Record<Priority, string> = {
@@ -20,11 +20,12 @@ export const PRIORITY_LABELS: Record<Priority, string> = {
 export const STATUS_LABELS: Record<TaskStatus, string> = {
   pending: "pendiente",
   in_progress: "en curso",
+  revision: "en revisión",
   done: "hecho",
 };
 
 export const PRIORITIES: Priority[] = ["low", "medium", "high", "urgent"];
-export const STATUSES: TaskStatus[] = ["pending", "in_progress", "done"];
+export const STATUSES: TaskStatus[] = ["pending", "in_progress", "revision", "done"];
 
 export interface Attachment {
   id: string;
@@ -112,6 +113,7 @@ export function groupByStatus(tasks: Task[]): KanbanColumns {
   const columns: KanbanColumns = {
     pending: [],
     in_progress: [],
+    revision: [],
     done: [],
   };
   for (const task of tasks) {

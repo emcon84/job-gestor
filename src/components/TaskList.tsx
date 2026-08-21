@@ -12,6 +12,7 @@ const PRIORITY_DOT: Record<string, string> = {
 const STATUS_COLOR: Record<string, string> = {
   pending: "text-status-pending",
   in_progress: "text-status-progress",
+  revision: "text-sky-400",
   done: "text-status-done",
 };
 

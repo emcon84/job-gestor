@@ -6,7 +6,6 @@ import { createTask, getUploadUrlAction } from "@/app/actions";
 import type { ActionResult } from "@/lib/action-types";
 import { MAX_ATTACHMENT_BYTES, resolveImageType } from "@/lib/r2";
 import type { Attachment, ServiceOption } from "@/lib/domain";
-import { formatArs } from "@/lib/format";
 
 const ACCEPT = "image/jpeg,image/png,image/webp,image/gif";
 
@@ -175,12 +174,12 @@ export default function SubmitForm({ services }: { services: ServiceOption[] }) 
           {services.length === 0 && <option value="">Sin servicios disponibles</option>}
           {services.map((s) => (
             <option key={s.id} value={s.id}>
-              {s.name} — {formatArs(s.defaultCostArs)}
+              {s.name}
             </option>
           ))}
         </select>
         <p className="mt-1 text-xs text-muted">
-          El costo del servicio se aplica automáticamente a la tarea.
+          Elegí el servicio que mejor describa la tarea.
         </p>
       </div>
 

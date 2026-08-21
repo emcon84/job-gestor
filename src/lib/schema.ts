@@ -33,7 +33,7 @@ export const tasks = pgTable("tasks", {
     .notNull()
     .default("medium"),
   status: text("status", {
-    enum: ["pending", "in_progress", "done"],
+    enum: ["pending", "in_progress", "revision", "done"],
   })
     .notNull()
     .default("pending"),

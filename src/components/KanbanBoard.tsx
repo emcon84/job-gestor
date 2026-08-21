@@ -10,18 +10,21 @@ import AttachmentThumbs from "@/components/AttachmentThumbs";
 const COLUMNS: { status: TaskStatus; label: string }[] = [
   { status: "pending", label: "Pendiente" },
   { status: "in_progress", label: "En curso" },
+  { status: "revision", label: "Revisión" },
   { status: "done", label: "Hecho" },
 ];
 
 const COLUMN_ACCENT: Record<TaskStatus, string> = {
   pending: "border-status-pending",
   in_progress: "border-status-progress",
+  revision: "border-sky-400",
   done: "border-status-done",
 };
 
 const STATUS_VALUE: Record<TaskStatus, string> = {
   pending: "pendiente",
   in_progress: "en curso",
+  revision: "en revisión",
   done: "hecho",
 };
 
