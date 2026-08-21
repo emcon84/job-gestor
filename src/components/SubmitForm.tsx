@@ -101,8 +101,15 @@ export default function SubmitForm({ services }: { services: ServiceOption[] }) 
       setStatus({ kind: "success", text: result.message ?? "Tarea enviada." });
       setFiles([]);
       form.reset();
-    } catch {
-      setStatus({ kind: "error", text: "No se pudo enviar la tarea. Intentá de nuevo." });
+    } catch (err) {
+      // Surface the real error detail (e.g. the Vercel Blob 400 body) so the
+      // client can report it and we can diagnose without DevTools.
+      const detail =
+        err instanceof Error && err.message ? ` ${err.message}` : "";
+      setStatus({
+        kind: "error",
+        text: `No se pudo enviar la tarea.${detail}`,
+      });
     } finally {
       setSubmitting(false);
     }
