@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { Info } from "lucide-react";
+import { FileDown, Info } from "lucide-react";
 import SubmitForm from "@/components/SubmitForm";
 import TaskList from "@/components/TaskList";
 import ProgressBar from "@/components/ProgressBar";
@@ -31,13 +31,23 @@ export default async function ClientPortalPage({
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-6 pb-28">
       <RefreshOnMount />
-      <header className="mb-6">
-        <h1 className="text-2xl font-bold text-primary">
-          Tareas de Mantenimiento y Desarrollo — {client.name}
-        </h1>
-        <p className="text-sm text-secondary">
-          Enviá una tarea y seguí su estado acá.
-        </p>
+      <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-primary">
+            Tareas de Mantenimiento y Desarrollo — {client.name}
+          </h1>
+          <p className="text-sm text-secondary">
+            Enviá una tarea y seguí su estado acá.
+          </p>
+        </div>
+        <a
+          href={`/api/report?clientId=${client.id}`}
+          download
+          className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-card-border bg-surface px-3 py-2 text-sm text-secondary transition-colors hover:border-accent hover:text-primary"
+        >
+          <FileDown className="h-4 w-4" aria-hidden />
+          Descargar reporte PDF
+        </a>
       </header>
 
       <section className="mb-10">
