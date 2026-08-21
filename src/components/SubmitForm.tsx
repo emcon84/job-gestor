@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { createTask, getUploadUrlAction } from "@/app/actions";
 import type { ActionResult } from "@/lib/action-types";
 import { MAX_ATTACHMENT_BYTES, resolveImageType } from "@/lib/r2";
@@ -10,6 +11,7 @@ import { formatArs } from "@/lib/format";
 const ACCEPT = "image/jpeg,image/png,image/webp,image/gif";
 
 export default function SubmitForm({ services }: { services: ServiceOption[] }) {
+  const router = useRouter();
   const [files, setFiles] = useState<File[]>([]);
   const [status, setStatus] = useState<{ kind: "idle" | "error" | "success"; text: string }>(
     { kind: "idle", text: "" },
@@ -95,6 +97,7 @@ export default function SubmitForm({ services }: { services: ServiceOption[] }) 
       setStatus({ kind: "success", text: result.message ?? "Tarea enviada." });
       setFiles([]);
       form.reset();
+      router.refresh();
     } catch (err) {
       // Surface the real error detail (e.g. the R2 PUT 403 body) so the
       // client can report it and we can diagnose without DevTools.

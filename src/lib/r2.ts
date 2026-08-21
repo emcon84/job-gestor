@@ -65,6 +65,20 @@ export function isR2Configured(): boolean {
   );
 }
 
+/**
+ * Returns the public r2.dev base URL, or null when it is missing or set to the
+ * S3 endpoint. R2_PUBLIC_BASE_URL MUST be the public r2.dev URL (e.g.
+ * https://pub-<hash>.r2.dev) — NOT the S3 endpoint
+ * (https://<account>.r2.cloudflarestorage.com), which cannot serve public
+ * objects and would produce broken image URLs.
+ */
+export function r2PublicBaseUrlOrNull(): string | null {
+  const base = process.env.R2_PUBLIC_BASE_URL?.trim() || "";
+  if (!base) return null;
+  if (base.includes(".r2.cloudflarestorage.com")) return null;
+  return base.replace(/\/+$/, "");
+}
+
 export interface UploadUrl {
   uploadUrl: string;
   objectKey: string;
@@ -84,12 +98,21 @@ export async function getUploadUrl({
   contentType: string;
 }): Promise<UploadUrl> {
   const objectKey = `${ATTACHMENT_PREFIX}/${Date.now()}-${sanitizeFilename(filename)}`;
-  const base = process.env.R2_PUBLIC_BASE_URL?.replace(/\/+$/, "");
-  const publicUrl = base ? `${base}/${objectKey}` : objectKey;
 
   if (!isR2Configured()) {
-    return { uploadUrl: "", objectKey, publicUrl };
+    return { uploadUrl: "", objectKey, publicUrl: objectKey };
   }
+
+  // Credentials ARE configured. If the public base is missing or points at the
+  // S3 endpoint (r2.cloudflarestorage.com), we must NOT produce a broken image
+  // URL. R2_PUBLIC_BASE_URL must be the public r2.dev URL (https://pub-...r2.dev),
+  // not the S3 endpoint. Fall back to dev mode (empty uploadUrl) so the submit
+  // form stores a local object URL instead of a URL that would never load.
+  const base = r2PublicBaseUrlOrNull();
+  if (!base) {
+    return { uploadUrl: "", objectKey, publicUrl: objectKey };
+  }
+  const publicUrl = `${base}/${objectKey}`;
 
   const client = new S3Client({
     region: "auto",

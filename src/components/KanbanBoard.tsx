@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { deleteTask, updateTask } from "@/app/actions";
 import { type Task, type TaskStatus } from "@/lib/domain";
 import { formatArs } from "@/lib/format";
@@ -57,6 +58,7 @@ export default function KanbanBoard({
 }
 
 function KanbanCard({ task }: { task: Task }) {
+  const router = useRouter();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const amountRef = useRef<HTMLInputElement>(null);
   const paymentRef = useRef<HTMLSelectElement>(null);
@@ -68,6 +70,7 @@ function KanbanCard({ task }: { task: Task }) {
     fd.set("status", next);
     const r = await updateTask(fd);
     setMsg(r.ok ? { kind: "success", text: "Estado actualizado." } : { kind: "error", text: r.error ?? "Error." });
+    if (r.ok) router.refresh();
   }
 
   async function saveEdits() {
@@ -77,6 +80,7 @@ function KanbanCard({ task }: { task: Task }) {
     fd.set("paymentState", paymentRef.current?.value ?? "");
     const r = await updateTask(fd);
     setMsg(r.ok ? { kind: "success", text: "Guardado." } : { kind: "error", text: r.error ?? "Error." });
+    if (r.ok) router.refresh();
   }
 
   async function onDelete() {
@@ -84,6 +88,7 @@ function KanbanCard({ task }: { task: Task }) {
     fd.set("id", task.id);
     const r = await deleteTask(fd);
     setMsg(r.ok ? { kind: "success", text: "Eliminada." } : { kind: "error", text: r.error ?? "Error." });
+    if (r.ok) router.refresh();
   }
 
   return (

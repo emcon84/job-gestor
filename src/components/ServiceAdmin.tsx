@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { createService, deleteService, updateService } from "@/app/actions";
 import type { ActionResult } from "@/lib/action-types";
 import type { ServiceOption } from "@/lib/domain";
@@ -11,6 +12,7 @@ import { centsToPesosInput } from "@/lib/format";
  * List, create, edit, and delete services from the /owner area.
  */
 export default function ServiceAdmin({ services }: { services: ServiceOption[] }) {
+  const router = useRouter();
   const [name, setName] = useState("");
   const [cost, setCost] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -27,6 +29,7 @@ export default function ServiceAdmin({ services }: { services: ServiceOption[] }
     if (r.ok) {
       setName("");
       setCost("");
+      router.refresh();
     }
   }
 
@@ -46,6 +49,7 @@ export default function ServiceAdmin({ services }: { services: ServiceOption[] }
     setMsg(r.ok ? { kind: "success", text: r.message ?? "Actualizado." } : { kind: "error", text: r.error ?? "Error." });
     if (r.ok) {
       setEditingId(null);
+      router.refresh();
     }
   }
 
@@ -54,6 +58,9 @@ export default function ServiceAdmin({ services }: { services: ServiceOption[] }
     fd.set("id", id);
     const r: ActionResult = await deleteService(fd);
     setMsg(r.ok ? { kind: "success", text: r.message ?? "Eliminado." } : { kind: "error", text: r.error ?? "Error." });
+    if (r.ok) {
+      router.refresh();
+    }
   }
 
   return (
