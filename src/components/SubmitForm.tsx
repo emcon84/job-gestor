@@ -62,11 +62,15 @@ export default function SubmitForm({ services }: { services: ServiceOption[] }) 
           // shared-link client portal and the owner dashboard. (Design D3
           // preferred private blobs; public is used here for durability and
           // testability — see apply-progress deviation note.)
-          const blob = await put(file.name, file, {
-            access: "public",
-            token,
-            contentType: file.type || undefined,
-          });
+          const blob = await put(
+            `attachments/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`,
+            file,
+            {
+              access: "public",
+              token,
+              contentType: file.type || undefined,
+            },
+          );
           attachments.push({
             id: crypto.randomUUID(),
             name: file.name,
