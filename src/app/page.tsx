@@ -2,6 +2,7 @@ import SubmitForm from "@/components/SubmitForm";
 import TaskList from "@/components/TaskList";
 import ProgressBar from "@/components/ProgressBar";
 import RefreshOnMount from "@/components/RefreshOnMount";
+import { Info } from "lucide-react";
 import { getRepository } from "@/lib/store";
 import { computePacks } from "@/lib/packs";
 
@@ -32,15 +33,21 @@ export default async function HomePage() {
 
       <section className="mb-10">
         <h2 className="mb-3 text-lg font-semibold text-primary">Tu abono</h2>
-        <div className="mb-3 rounded-2xl border border-card-border bg-card p-5 space-y-2">
-          <p className="text-sm text-secondary">
-            El abono es el acuerdo de costo mensual por mantenimiento. No es
-            estricto: puede sobrepasarse si es necesario.
-          </p>
-          <p className="text-sm text-secondary">
-            En los meses donde no se realizan tareas no se cobra — solo se cobra
-            lo que se ve en este listado.
-          </p>
+        <div
+          role="note"
+          className="mb-3 flex items-start gap-3 rounded-2xl border border-accent/40 bg-accent/10 p-4"
+        >
+          <Info className="mt-0.5 h-5 w-5 shrink-0 text-accent" aria-hidden />
+          <div className="space-y-1 text-sm text-secondary">
+            <p>
+              El abono es el acuerdo de costo mensual por mantenimiento. No es
+              estricto: puede sobrepasarse si es necesario.
+            </p>
+            <p>
+              En los meses donde no se realizan tareas no se cobra — solo se
+              cobra lo que se ve en este listado.
+            </p>
+          </div>
         </div>
         {tasks.length > 0 && <ProgressBar summary={packSummary} />}
       </section>
