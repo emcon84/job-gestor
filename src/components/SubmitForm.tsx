@@ -1,10 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { put } from "@vercel/blob/client";
-import { createTask, getUploadTokenAction } from "@/app/actions";
+import { createTask, getUploadUrlAction } from "@/app/actions";
 import type { ActionResult } from "@/lib/action-types";
-import { MAX_ATTACHMENT_BYTES, resolveImageType } from "@/lib/blob";
+import { MAX_ATTACHMENT_BYTES, resolveImageType } from "@/lib/r2";
 import type { Attachment, ServiceOption } from "@/lib/domain";
 import { formatArs } from "@/lib/format";
 
@@ -53,41 +52,36 @@ export default function SubmitForm({ services }: { services: ServiceOption[] }) 
       const form = e.currentTarget;
       const attachments: Attachment[] = [];
 
-      const { token } = await getUploadTokenAction();
-
       for (const file of files) {
-        if (token) {
-          // Production: direct upload to Vercel Blob with scoped token.
-          // Public access so attachment images are directly viewable from the
-          // shared-link client portal and the owner dashboard. (Design D3
-          // preferred private blobs; public is used here for durability and
-          // testability — see apply-progress deviation note.)
-          const blob = await put(
-            `attachments/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`,
-            file,
-            {
-              access: "public",
-              token,
-              contentType: file.type || undefined,
-            },
-          );
-          attachments.push({
-            id: crypto.randomUUID(),
-            name: file.name,
-            url: blob.url,
-            contentType: file.type || "application/octet-stream",
-            sizeBytes: file.size,
-          });
-        } else {
-          // Dev fallback (no Blob token): keep a local object URL.
+        const contentType = file.type || "application/octet-stream";
+        const { ok, uploadUrl, publicUrl } = await getUploadUrlAction(
+          file.name,
+          file.type || "",
+        );
+        if (!ok || !uploadUrl) {
+          // Dev fallback (R2 not configured): keep a local object URL.
           attachments.push({
             id: crypto.randomUUID(),
             name: file.name,
             url: URL.createObjectURL(file),
-            contentType: file.type || "application/octet-stream",
+            contentType,
             sizeBytes: file.size,
           });
+          continue;
         }
+        // Production: direct upload to Cloudflare R2 via the presigned PUT URL.
+        await fetch(uploadUrl, {
+          method: "PUT",
+          body: file,
+          headers: { "Content-Type": contentType },
+        });
+        attachments.push({
+          id: crypto.randomUUID(),
+          name: file.name,
+          url: publicUrl ?? "",
+          contentType,
+          sizeBytes: file.size,
+        });
       }
 
       const data = new FormData(form);
@@ -102,7 +96,7 @@ export default function SubmitForm({ services }: { services: ServiceOption[] }) 
       setFiles([]);
       form.reset();
     } catch (err) {
-      // Surface the real error detail (e.g. the Vercel Blob 400 body) so the
+      // Surface the real error detail (e.g. the R2 PUT 403 body) so the
       // client can report it and we can diagnose without DevTools.
       const detail =
         err instanceof Error && err.message ? ` ${err.message}` : "";

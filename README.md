@@ -60,14 +60,18 @@ Migrations are committed so the Neon DB can be recreated from scratch.
 ## Deploying to Vercel
 
 1. Push the repo to GitHub and import it into Vercel (or `vercel deploy`).
-2. Create a **Neon** Postgres database and a **Vercel Blob** store.
+2. Create a **Neon** Postgres database and a **Cloudflare R2** bucket.
 3. Set these environment variables in Vercel → Project → Settings → Environment:
 
 | Variable               | Required | Notes                                                          |
 | ---------------------- | -------- | -------------------------------------------------------------- |
 | `DATABASE_URL`         | Yes      | Neon **pooled** connection string (`?sslmode=require`)         |
 | `OWNER_PASSPHRASE`     | Yes      | Secret passphrase to unlock the owner panel (httpOnly cookie)  |
-| `BLOB_READ_WRITE_TOKEN`| Yes      | Vercel Blob read/write token (client upload tokens)            |
+| `R2_ACCOUNT_ID`        | Yes      | Cloudflare R2 account ID (R2 → Overview)                       |
+| `R2_ACCESS_KEY_ID`     | Yes      | R2 API token access key (R2 → Manage R2 API Tokens)            |
+| `R2_SECRET_ACCESS_KEY` | Yes      | R2 API token secret key                                        |
+| `R2_BUCKET`            | Yes      | R2 bucket name that stores attachments                         |
+| `R2_PUBLIC_BASE_URL`   | Optional | Public r2.dev URL (bucket → Settings → Public access)          |
 | `APP_URL`              | Optional | Public origin of the app                                       |
 
 4. Run `npm run db:migrate` against the fresh Neon DB before first use
@@ -102,7 +106,8 @@ src/
     domain.ts               # types + pure logic (grouping, status transitions)
     format.ts               # ARS formatting + pesos↔cents parsing
     auth.ts                 # constant-time passphrase + rate limiting
-    blob.ts                 # Vercel Blob image whitelist / token
+    blob.ts                 # (removed — now src/lib/r2.ts) image whitelist / upload
+    r2.ts                   # Cloudflare R2 image whitelist / presigned upload
     repository.ts           # TaskRepository interface
     store.ts                # selects Postgres (prod) or Memory (dev) repository
     schema.ts               # Drizzle schema (tasks, attachments)

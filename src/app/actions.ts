@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { COOKIE_NAME, COOKIE_VALUE, verifyPassphrase } from "@/lib/auth";
-import { getUploadToken, MAX_ATTACHMENT_BYTES, resolveImageType } from "@/lib/blob";
+import { getUploadUrl, MAX_ATTACHMENT_BYTES, resolveImageType } from "@/lib/r2";
 import type {
   Attachment,
   PaymentState,
@@ -15,7 +15,7 @@ import type {
 import { PRIORITIES, STATUSES } from "@/lib/domain";
 import { parsePesosToCents } from "@/lib/format";
 import { getRepository } from "@/lib/store";
-import type { ActionResult, UnlockState, UploadTokenResult } from "@/lib/action-types";
+import type { ActionResult, UnlockState, UploadUrlResult } from "@/lib/action-types";
 
 /** Reads whether the current request carries a valid owner cookie. */
 export async function isOwner(): Promise<boolean> {
@@ -33,12 +33,25 @@ async function rateLimitKey(): Promise<string> {
 }
 
 /**
- * Returns a scoped client upload token for direct-to-Blob image uploads.
+ * Returns a presigned PUT URL for a direct-to-R2 image upload.
  * Safe for unauthenticated clients (the client portal is shared-link).
  */
-export async function getUploadTokenAction(): Promise<UploadTokenResult> {
-  const { token, maxSizeBytes } = await getUploadToken();
-  return { ok: true, token, maxSizeBytes };
+export async function getUploadUrlAction(
+  filename: string,
+  contentType: string,
+): Promise<UploadUrlResult> {
+  if (!filename) {
+    return { ok: false, error: "Falta el nombre del archivo." };
+  }
+  const mime = resolveImageType(contentType, filename);
+  if (!mime) {
+    return { ok: false, error: "Solo se permiten archivos de imagen." };
+  }
+  const { uploadUrl, objectKey, publicUrl } = await getUploadUrl({
+    filename,
+    contentType: mime,
+  });
+  return { ok: true, uploadUrl, objectKey, publicUrl, maxSizeBytes: MAX_ATTACHMENT_BYTES };
 }
 
 /**

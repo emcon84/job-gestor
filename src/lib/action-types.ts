@@ -10,8 +10,10 @@ export interface ActionResult {
   message?: string;
 }
 
-export interface UploadTokenResult extends ActionResult {
-  token?: string;
+export interface UploadUrlResult extends ActionResult {
+  uploadUrl?: string;
+  objectKey?: string;
+  publicUrl?: string;
   maxSizeBytes?: number;
 }
 
