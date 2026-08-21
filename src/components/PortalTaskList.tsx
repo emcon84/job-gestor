@@ -1,11 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { PRIORITY_LABELS, STATUS_LABELS, isDueDateOverdue, type Task } from "@/lib/domain";
+import { useRouter } from "next/navigation";
+import {
+  MAX_CLIENT_MOVES,
+  PRIORITY_LABELS,
+  STATUS_LABELS,
+  canClientMove,
+  isDueDateOverdue,
+  type Task,
+  type TaskStatus,
+} from "@/lib/domain";
 import { formatArs, formatDateEs } from "@/lib/format";
 import AttachmentThumbs from "@/components/AttachmentThumbs";
 import PaymentBadge from "@/components/PaymentBadge";
 import PortalTaskItem from "@/components/PortalTaskItem";
+import { moveTaskStatusClient } from "@/app/actions";
+import { COLUMNS, MOVE_BUTTON_COLOR, STATUS_ICON } from "@/components/kanban-meta";
 
 const PRIORITY_DOT: Record<string, string> = {
   low: "bg-muted",
@@ -42,12 +53,37 @@ function matchesFilter(task: Task, filter: PaymentFilter): boolean {
  * delegates rendering here so the client can filter without a page reload.
  */
 export default function PortalTaskList({ tasks }: { tasks: Task[] }) {
+  const router = useRouter();
   const [filter, setFilter] = useState<PaymentFilter>("all");
+  const [movingId, setMovingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function moveStatus(task: Task, next: TaskStatus) {
+    const fd = new FormData();
+    fd.set("id", task.id);
+    fd.set("status", next);
+    setMovingId(task.id);
+    setError(null);
+    const r = await moveTaskStatusClient(fd);
+    if (!r.ok) {
+      setError(r.error ?? "Error.");
+    }
+    setMovingId(null);
+    router.refresh();
+  }
 
   const visible = tasks.filter((t) => matchesFilter(t, filter));
 
   return (
     <div className="space-y-4">
+      {error && (
+        <p
+          role="alert"
+          className="rounded-2xl border border-error/40 bg-error/10 p-3 text-sm text-error"
+        >
+          {error}
+        </p>
+      )}
       <div
         role="group"
         aria-label="Filtrar por estado de pago"
@@ -131,10 +167,70 @@ export default function PortalTaskList({ tasks }: { tasks: Task[] }) {
                   sizeClass="h-16 w-16"
                 />
               )}
+
+              <ClientStatusMoves
+                task={task}
+                moving={movingId === task.id}
+                onMove={(next) => moveStatus(task, next)}
+              />
             </PortalTaskItem>
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+/**
+ * Client-facing status move controls for a portal card. Shows compact move
+ * buttons when the client still has moves left (task not done and below the
+ * hard limit); a muted notice once the limit is reached; nothing when done.
+ */
+function ClientStatusMoves({
+  task,
+  moving,
+  onMove,
+}: {
+  task: Task;
+  moving: boolean;
+  onMove: (next: TaskStatus) => void;
+}) {
+  if (task.status === "done") {
+    return null;
+  }
+
+  if (!canClientMove(task)) {
+    return (
+      <p className="text-xs text-muted">Límite de movimientos alcanzado</p>
+    );
+  }
+
+  const remaining = MAX_CLIENT_MOVES - task.clientMoveCount;
+  const targets = COLUMNS.filter((c) => c.status !== task.status);
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex flex-wrap gap-1.5">
+        {targets.map((c) => {
+          const Icon = STATUS_ICON[c.status];
+          return (
+            <button
+              key={c.status}
+              type="button"
+              disabled={moving}
+              onClick={() => onMove(c.status)}
+              title={`Mover a ${c.label}`}
+              className={`flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-card-border bg-surface px-2 py-2 text-xs font-medium ${MOVE_BUTTON_COLOR[c.status]} disabled:opacity-50`}
+            >
+              <Icon className="h-4 w-4 shrink-0" />
+              <span className="truncate">{c.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      <p className="text-[11px] text-muted">
+        {remaining}/{MAX_CLIENT_MOVES} movimientos
+      </p>
     </div>
   );
 }

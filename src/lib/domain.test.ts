@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  MAX_CLIENT_MOVES,
+  canClientMove,
   groupByStatus,
   isDueDateOverdue,
   parseDueDate,
@@ -17,6 +19,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     area: "A",
     priority: "medium",
     status: "pending",
+    clientMoveCount: 0,
     amountArs: 0,
     paymentState: null,
     paymentDueDate: null,
@@ -56,6 +59,29 @@ describe("groupByStatus", () => {
     expect(columns.pending).toEqual([]);
     expect(columns.in_progress).toEqual([]);
     expect(columns.done).toEqual([]);
+  });
+});
+
+describe("canClientMove", () => {
+  it("returns true while the task is not done and below the limit", () => {
+    expect(canClientMove({ status: "pending", clientMoveCount: 0 })).toBe(true);
+    expect(
+      canClientMove({ status: "in_progress", clientMoveCount: MAX_CLIENT_MOVES - 1 }),
+    ).toBe(true);
+  });
+
+  it("blocks moving a done task", () => {
+    expect(canClientMove({ status: "done", clientMoveCount: 0 })).toBe(false);
+  });
+
+  it("blocks when the client has reached the move limit", () => {
+    expect(
+      canClientMove({ status: "pending", clientMoveCount: MAX_CLIENT_MOVES }),
+    ).toBe(false);
+  });
+
+  it("exposes the max constant", () => {
+    expect(MAX_CLIENT_MOVES).toBe(5);
   });
 });
 

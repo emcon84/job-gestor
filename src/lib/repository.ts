@@ -25,6 +25,8 @@ import type {
 export interface TaskRepository {
   /** Lists all tasks, newest first, each carrying its attachments and comments. */
   listTasks(): Promise<Task[]>;
+  /** Returns a single task with its attachments and comments, or null. */
+  getTask(id: string): Promise<Task | null>;
   /** Creates a task with its attachments and resolves its cost from a service. */
   createTask(input: NewTask): Promise<Task>;
   /** Updates a task (status/amount/payment). Overwrites — no history. */

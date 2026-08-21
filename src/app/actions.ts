@@ -16,6 +16,7 @@ import type {
 import {
   PRIORITIES,
   STATUSES,
+  canClientMove,
   parseDueDate,
   validateCommentAuthorName,
   validateCommentBody,
@@ -254,6 +255,58 @@ export async function updateTask(formData: FormData): Promise<ActionResult> {
   revalidatePath("/owner");
   revalidatePath("/");
   return { ok: true, message: "Tarea actualizada." };
+}
+
+/**
+ * Moves a task's status. When the request carries the owner cookie it behaves
+ * like a normal status update (no counter, no limit). For a client (portal),
+ * the move is only allowed while the task is not done and the client still has
+ * moves remaining; on success the status is set and the client move counter is
+ * incremented.
+ */
+export async function moveTaskStatusClient(
+  formData: FormData,
+): Promise<ActionResult> {
+  const id = (formData.get("id") as string | null) ?? "";
+  const statusRaw = formData.get("status") as string | null;
+
+  if (!id) {
+    return { ok: false, error: "Falta el id de la tarea." };
+  }
+  if (!statusRaw || !isStatus(statusRaw)) {
+    return { ok: false, error: "Estado inválido." };
+  }
+
+  const repo = await getRepository();
+  const task = await repo.getTask(id);
+  if (!task) {
+    return { ok: false, error: "No se encontró la tarea." };
+  }
+
+  if (await isOwner()) {
+    await repo.updateTask(id, { status: statusRaw });
+    revalidatePath("/");
+    revalidatePath("/owner");
+    return { ok: true, message: "Estado actualizado." };
+  }
+
+  if (task.status === "done") {
+    return { ok: false, error: "La tarea ya está completada." };
+  }
+  if (!canClientMove(task)) {
+    return {
+      ok: false,
+      error: "Se alcanzó el límite de movimientos para esta tarea.",
+    };
+  }
+
+  await repo.updateTask(id, {
+    status: statusRaw,
+    clientMoveCount: task.clientMoveCount + 1,
+  });
+  revalidatePath("/");
+  revalidatePath("/owner");
+  return { ok: true, message: "Estado actualizado." };
 }
 
 /**

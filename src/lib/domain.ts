@@ -27,6 +27,20 @@ export const STATUS_LABELS: Record<TaskStatus, string> = {
 export const PRIORITIES: Priority[] = ["low", "medium", "high", "urgent"];
 export const STATUSES: TaskStatus[] = ["pending", "in_progress", "revision", "done"];
 
+/** Hard limit on how many status moves a client (portal) can make per task. */
+export const MAX_CLIENT_MOVES = 5;
+
+/**
+ * Whether the client portal may still move this task's status. Blocked once the
+ * task is done or the client has used all its moves.
+ */
+export function canClientMove(task: {
+  status: TaskStatus;
+  clientMoveCount: number;
+}): boolean {
+  return task.status !== "done" && task.clientMoveCount < MAX_CLIENT_MOVES;
+}
+
 export interface Attachment {
   id: string;
   name: string;
@@ -128,6 +142,8 @@ export interface Task {
   area: string;
   priority: Priority;
   status: TaskStatus;
+  /** Number of status moves the client has already made on this task. */
+  clientMoveCount: number;
   /** Amount in ARS, stored as integer cents. Auto-filled from the assigned service. */
   amountArs: number;
   paymentState: PaymentState | null;
@@ -157,6 +173,8 @@ export interface NewTask {
 /** Fields the owner may edit on an existing task (status / amount / payment). */
 export interface TaskUpdate {
   status?: TaskStatus;
+  /** Client-initiated move count. Only the client move action sets this. */
+  clientMoveCount?: number;
   amountArs?: number;
   paymentState?: PaymentState | null;
   /** Optional payment due date. `null` clears an existing value. */

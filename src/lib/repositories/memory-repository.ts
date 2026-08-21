@@ -39,6 +39,10 @@ export class MemoryRepository implements TaskRepository, ServiceRepository {
     });
   }
 
+  async getTask(id: string): Promise<Task | null> {
+    return this.tasks.get(id) ?? null;
+  }
+
   async createTask(input: NewTask): Promise<Task> {
     const now = new Date();
     const cost = await this.resolveServiceCost(input.serviceId);
@@ -49,6 +53,7 @@ export class MemoryRepository implements TaskRepository, ServiceRepository {
       area: input.area,
       priority: input.priority,
       status: "pending",
+      clientMoveCount: 0,
       amountArs: cost ?? 0,
       paymentState: null,
       paymentDueDate: null,
@@ -73,6 +78,10 @@ export class MemoryRepository implements TaskRepository, ServiceRepository {
     const updated: Task = {
       ...existing,
       status,
+      clientMoveCount:
+        update.clientMoveCount !== undefined
+          ? update.clientMoveCount
+          : existing.clientMoveCount,
       amountArs:
         update.amountArs !== undefined ? update.amountArs : existing.amountArs,
       paymentState:

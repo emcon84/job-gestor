@@ -36,6 +36,7 @@ function mapTask(
     area: row.area,
     priority: row.priority as Priority,
     status: row.status as TaskStatus,
+    clientMoveCount: row.clientMoveCount,
     amountArs: row.amountArs,
     paymentState: row.paymentState as PaymentState | null,
     paymentDueDate: row.paymentDueDate,
@@ -133,6 +134,25 @@ export class PostgresRepository implements TaskRepository, ServiceRepository {
     );
   }
 
+  async getTask(id: string): Promise<Task | null> {
+    const [row] = await db.select().from(tasks).where(eq(tasks.id, id));
+    if (!row) {
+      return null;
+    }
+    const attRows = await db
+      .select()
+      .from(attachments)
+      .where(eq(attachments.taskId, id));
+    const commentRows = await db
+      .select()
+      .from(comments)
+      .where(eq(comments.taskId, id));
+    return mapTask(
+      { ...row, att: attRows },
+      sortComments(commentRows.map(mapComment)),
+    );
+  }
+
   async createTask(input: NewTask): Promise<Task> {
     const created = await db.transaction(async (tx) => {
       const [taskRow] = await tx
@@ -190,6 +210,10 @@ export class PostgresRepository implements TaskRepository, ServiceRepository {
       .update(tasks)
       .set({
         status,
+        clientMoveCount:
+          update.clientMoveCount !== undefined
+            ? update.clientMoveCount
+            : existing.clientMoveCount,
         amountArs:
           update.amountArs !== undefined ? update.amountArs : existing.amountArs,
         paymentState:

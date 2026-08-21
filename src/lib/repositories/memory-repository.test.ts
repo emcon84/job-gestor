@@ -29,6 +29,7 @@ describe("MemoryRepository", () => {
     const task = await repo.createTask(sampleTask());
     expect(task.id).toBeTruthy();
     expect(task.status).toBe("pending");
+    expect(task.clientMoveCount).toBe(0);
     expect(task.amountArs).toBe(50_000_00);
     expect(task.serviceId).toBe(sampleTask.defaultServiceId);
     expect(task.paymentState).toBeNull();
@@ -120,6 +121,27 @@ describe("MemoryRepository", () => {
   it("returns null when updating an unknown task", async () => {
     const result = await repo.updateTask("missing", { status: "done" });
     expect(result).toBeNull();
+  });
+
+  it("gets a task by id, or null when it does not exist", async () => {
+    const created = await repo.createTask(sampleTask());
+    const found = await repo.getTask(created.id);
+    expect(found?.id).toBe(created.id);
+    expect(found?.title).toBe(created.title);
+    expect(await repo.getTask("missing")).toBeNull();
+  });
+
+  it("round-trips clientMoveCount through updateTask", async () => {
+    const created = await repo.createTask(sampleTask());
+    expect(created.clientMoveCount).toBe(0);
+    const updated = await repo.updateTask(created.id, {
+      status: "in_progress",
+      clientMoveCount: 1,
+    });
+    expect(updated?.status).toBe("in_progress");
+    expect(updated?.clientMoveCount).toBe(1);
+    const fetched = await repo.getTask(created.id);
+    expect(fetched?.clientMoveCount).toBe(1);
   });
 
   it("deletes a task", async () => {

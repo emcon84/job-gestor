@@ -10,6 +10,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     area: "A",
     priority: "medium",
     status: "pending",
+    clientMoveCount: 0,
     amountArs: 0,
     paymentState: null,
     paymentDueDate: null,
