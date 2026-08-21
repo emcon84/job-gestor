@@ -1,0 +1,253 @@
+"use client";
+
+import { useState } from "react";
+import { put } from "@vercel/blob/client";
+import { createTask, getUploadTokenAction } from "@/app/actions";
+import type { ActionResult } from "@/lib/action-types";
+import { MAX_ATTACHMENT_BYTES, resolveImageType } from "@/lib/blob";
+import type { Attachment, ServiceOption } from "@/lib/domain";
+import { formatArs } from "@/lib/format";
+
+const ACCEPT = "image/jpeg,image/png,image/webp,image/gif";
+
+export default function SubmitForm({ services }: { services: ServiceOption[] }) {
+  const [files, setFiles] = useState<File[]>([]);
+  const [status, setStatus] = useState<{ kind: "idle" | "error" | "success"; text: string }>(
+    { kind: "idle", text: "" },
+  );
+  const [submitting, setSubmitting] = useState(false);
+  const [serviceId, setServiceId] = useState(services[0]?.id ?? "");
+
+  function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const selected = Array.from(e.target.files ?? []);
+    const errors: string[] = [];
+    const ok: File[] = [];
+    for (const f of selected) {
+      if (f.size > MAX_ATTACHMENT_BYTES) {
+        errors.push(`"${f.name}" supera los 10MB.`);
+        continue;
+      }
+      if (!resolveImageType(f.type, f.name)) {
+        errors.push(`"${f.name}" no es una imagen permitida (JPG, PNG, WEBP, GIF).`);
+        continue;
+      }
+      ok.push(f);
+    }
+    if (errors.length) {
+      setStatus({ kind: "error", text: errors.join(" ") });
+    }
+    setFiles((prev) => [...prev, ...ok].slice(0, 10));
+    e.target.value = "";
+  }
+
+  function removeFile(index: number) {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSubmitting(true);
+    setStatus({ kind: "idle", text: "" });
+
+    try {
+      const form = e.currentTarget;
+      const attachments: Attachment[] = [];
+
+      const { token } = await getUploadTokenAction();
+
+      for (const file of files) {
+        if (token) {
+          // Production: direct upload to Vercel Blob with scoped token.
+          // Public access so attachment images are directly viewable from the
+          // shared-link client portal and the owner dashboard. (Design D3
+          // preferred private blobs; public is used here for durability and
+          // testability — see apply-progress deviation note.)
+          const blob = await put(file.name, file, {
+            access: "public",
+            token,
+            contentType: file.type || undefined,
+          });
+          attachments.push({
+            id: crypto.randomUUID(),
+            name: file.name,
+            url: blob.url,
+            contentType: file.type || "application/octet-stream",
+            sizeBytes: file.size,
+          });
+        } else {
+          // Dev fallback (no Blob token): keep a local object URL.
+          attachments.push({
+            id: crypto.randomUUID(),
+            name: file.name,
+            url: URL.createObjectURL(file),
+            contentType: file.type || "application/octet-stream",
+            sizeBytes: file.size,
+          });
+        }
+      }
+
+      const data = new FormData(form);
+      data.set("attachments", JSON.stringify(attachments));
+
+      const result: ActionResult = await createTask(data);
+      if (!result.ok) {
+        setStatus({ kind: "error", text: result.error ?? "Ocurrió un error." });
+        return;
+      }
+      setStatus({ kind: "success", text: result.message ?? "Tarea enviada." });
+      setFiles([]);
+      form.reset();
+    } catch {
+      setStatus({ kind: "error", text: "No se pudo enviar la tarea. Intentá de nuevo." });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="rounded-2xl border border-card-border bg-card p-5 space-y-4"
+      style={{ touchAction: "manipulation" }}
+    >
+      <div>
+        <label htmlFor="title" className="block text-sm font-medium text-primary">
+          Título *
+        </label>
+        <input
+          id="title"
+          name="title"
+          type="text"
+          required
+          maxLength={120}
+          className="mt-1 w-full rounded-lg border border-card-border bg-surface px-3 py-2 text-primary text-base focus:border-accent focus:outline-none"
+        />
+      </div>
+
+      <div>
+        <label htmlFor="area" className="block text-sm font-medium text-primary">
+          Área / Sistema *
+        </label>
+        <input
+          id="area"
+          name="area"
+          type="text"
+          required
+          maxLength={80}
+          placeholder="Ej: backend, app web, red..."
+          className="mt-1 w-full rounded-lg border border-card-border bg-surface px-3 py-2 text-primary text-base focus:border-accent focus:outline-none"
+        />
+      </div>
+
+      <div>
+        <label htmlFor="description" className="block text-sm font-medium text-primary">
+          Descripción *
+        </label>
+        <textarea
+          id="description"
+          name="description"
+          required
+          rows={4}
+          maxLength={2000}
+          className="mt-1 w-full rounded-lg border border-card-border bg-surface px-3 py-2 text-primary text-base focus:border-accent focus:outline-none"
+        />
+      </div>
+
+      <div>
+        <label htmlFor="serviceId" className="block text-sm font-medium text-primary">
+          Servicio *
+        </label>
+        <select
+          id="serviceId"
+          name="serviceId"
+          value={serviceId}
+          onChange={(e) => setServiceId(e.target.value)}
+          className="mt-1 w-full rounded-lg border border-card-border bg-surface px-3 py-2 text-primary text-base focus:border-accent focus:outline-none"
+        >
+          {services.length === 0 && <option value="">Sin servicios disponibles</option>}
+          {services.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name} — {formatArs(s.defaultCostArs)}
+            </option>
+          ))}
+        </select>
+        <p className="mt-1 text-xs text-muted">
+          El costo del servicio se aplica automáticamente a la tarea.
+        </p>
+      </div>
+
+      <div>
+        <label htmlFor="priority" className="block text-sm font-medium text-primary">
+          Prioridad
+        </label>
+        <select
+          id="priority"
+          name="priority"
+          defaultValue="medium"
+          className="mt-1 w-full rounded-lg border border-card-border bg-surface px-3 py-2 text-primary text-base focus:border-accent focus:outline-none"
+        >
+          <option value="low">Baja</option>
+          <option value="medium">Media</option>
+          <option value="high">Alta</option>
+          <option value="urgent">Urgente</option>
+        </select>
+      </div>
+
+      <div>
+        <label htmlFor="attachments" className="block text-sm font-medium text-primary">
+          Imágenes (opcional)
+        </label>
+        <input
+          id="attachments"
+          name="attachments"
+          type="file"
+          accept={ACCEPT}
+          capture="environment"
+          multiple
+          onChange={onFileChange}
+          className="mt-1 w-full rounded-lg border border-card-border bg-surface px-3 py-2 text-sm text-primary"
+        />
+        {files.length > 0 && (
+          <ul className="mt-2 space-y-1">
+            {files.map((f, i) => (
+              <li
+                key={`${f.name}-${i}`}
+                className="flex items-center justify-between gap-2 rounded-md bg-surface px-3 py-2 text-sm text-secondary"
+              >
+                <span className="truncate">{f.name}</span>
+                <button
+                  type="button"
+                  onClick={() => removeFile(i)}
+                  className="min-h-11 min-w-11 rounded-md px-2 text-muted hover:text-primary"
+                  aria-label={`Quitar ${f.name}`}
+                >
+                  ✕
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="mt-1 text-xs text-muted">Solo imágenes, máx 10MB cada una.</p>
+      </div>
+
+      <button
+        type="submit"
+        disabled={submitting}
+        className="w-full min-h-11 rounded-lg bg-accent px-4 py-2 font-semibold text-white disabled:opacity-60"
+      >
+        {submitting ? "Enviando..." : "Enviar tarea"}
+      </button>
+
+      {status.kind === "error" && (
+        <p role="alert" className="rounded-md bg-error/15 px-3 py-2 text-sm text-error">
+          {status.text}
+        </p>
+      )}
+      {status.kind === "success" && (
+        <p role="status" className="rounded-md bg-success/15 px-3 py-2 text-sm text-success">
+          {status.text}
+        </p>
+      )}
+    </form>
+  );
+}

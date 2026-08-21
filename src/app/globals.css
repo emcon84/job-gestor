@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   job-gestor dark theme (Tailwind v4 CSS-first)
+   Anchored on the dark navy observed at emilianticonti.com.
+--------------------------------------------------------------------------- */
+
+@theme {
+  /* Fonts */
+  --font-sans: var(--font-montserrat), Arial, Helvetica, sans-serif;
+
+  /* Surfaces */
+  --color-background: #10162c; /* base navy */
+  --color-surface: #1a2240; /* elevated cards / inputs */
+  --color-card: #1a2240; /* task cards */
+  --color-card-border: #2b3554; /* subtle borders */
+
+  /* Text */
+  --color-primary: #f3f4f8; /* near-white */
+  --color-secondary: #a7aec6; /* body text */
+  --color-muted: #7c84a3; /* captions */
+
+  /* Accent */
+  --color-accent: #4f8cff; /* primary buttons / links */
+
+  /* Status */
+  --color-status-pending: #64748b;
+  --color-status-progress: #eab308;
+  --color-status-done: #22c55e;
+  --color-status-urgent: #ef4444;
+
+  /* Feedback */
+  --color-error: #ef4444;
+  --color-success: #22c55e;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-primary);
+  font-family: var(--font-montserrat), Arial, Helvetica, sans-serif;
+  min-height: 100vh;
+  /* Respect notched phones */
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Remove the 300ms tap delay and allow double-tap-zoom disabling on controls */
+button,
+a,
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}
+
+/* Prevent accidental zoom on iOS when focusing form fields (>=16px font) */
+input,
+select,
+textarea {
+  font-size: 16px;
+}
