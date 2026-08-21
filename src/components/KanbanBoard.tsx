@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { CircleCheck, Eye, Play, Undo2, type LucideIcon } from "lucide-react";
 import { deleteTask, updateTask } from "@/app/actions";
 import { type Task, type TaskStatus } from "@/lib/domain";
 import { formatArs } from "@/lib/format";
@@ -28,34 +29,52 @@ const STATUS_VALUE: Record<TaskStatus, string> = {
   done: "hecho",
 };
 
+/** Icon per target status for the move-status buttons. */
+const STATUS_ICON: Record<TaskStatus, LucideIcon> = {
+  pending: Undo2,
+  in_progress: Play,
+  revision: Eye,
+  done: CircleCheck,
+};
+
+/** Accent color per target status for the move-status buttons. */
+const MOVE_BUTTON_COLOR: Record<TaskStatus, string> = {
+  pending: "text-secondary hover:border-secondary",
+  in_progress: "text-status-progress hover:border-status-progress",
+  revision: "text-sky-400 hover:border-sky-400",
+  done: "text-status-done hover:border-status-done",
+};
+
 export default function KanbanBoard({
   columns,
 }: {
   columns: Record<TaskStatus, Task[]>;
 }) {
   return (
-    <div className="grid gap-4 md:grid-cols-3">
-      {COLUMNS.map((col) => (
-        <section
-          key={col.status}
-          className={`rounded-2xl border border-t-4 ${COLUMN_ACCENT[col.status]} bg-surface/40 p-3`}
-        >
-          <h2 className="mb-3 px-1 text-sm font-semibold text-primary">
-            {col.label}{" "}
-            <span className="text-muted">({columns[col.status].length})</span>
-          </h2>
-          <div className="space-y-3">
-            {columns[col.status].length === 0 && (
-              <p className="rounded-xl border border-dashed border-card-border px-3 py-6 text-center text-xs text-muted">
-                Sin tareas
-              </p>
-            )}
-            {columns[col.status].map((task) => (
-              <KanbanCard key={task.id} task={task} />
-            ))}
-          </div>
-        </section>
-      ))}
+    <div className="overflow-x-auto pb-2">
+      <div className="flex min-w-max gap-4">
+        {COLUMNS.map((col) => (
+          <section
+            key={col.status}
+            className={`w-64 shrink-0 rounded-2xl border border-t-4 ${COLUMN_ACCENT[col.status]} bg-surface/40 p-3`}
+          >
+            <h2 className="mb-3 px-1 text-sm font-semibold text-primary">
+              {col.label}{" "}
+              <span className="text-muted">({columns[col.status].length})</span>
+            </h2>
+            <div className="space-y-3">
+              {columns[col.status].length === 0 && (
+                <p className="rounded-xl border border-dashed border-card-border px-3 py-6 text-center text-xs text-muted">
+                  Sin tareas
+                </p>
+              )}
+              {columns[col.status].map((task) => (
+                <KanbanCard key={task.id} task={task} />
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
     </div>
   );
 }
@@ -124,17 +143,22 @@ function KanbanCard({ task }: { task: Task }) {
       )}
 
       {/* Move status */}
-      <div className="flex gap-2">
-        {COLUMNS.filter((c) => c.status !== task.status).map((c) => (
-          <button
-            key={c.status}
-            type="button"
-            onClick={() => moveStatus(c.status)}
-            className="min-h-11 flex-1 rounded-lg bg-surface px-2 py-2 text-xs font-medium text-primary hover:border-accent border border-card-border"
-          >
-            → {c.label}
-          </button>
-        ))}
+      <div className="grid grid-cols-3 gap-1.5">
+        {COLUMNS.filter((c) => c.status !== task.status).map((c) => {
+          const Icon = STATUS_ICON[c.status];
+          return (
+            <button
+              key={c.status}
+              type="button"
+              onClick={() => moveStatus(c.status)}
+              title={`Mover a ${c.label}`}
+              className={`min-h-11 flex items-center justify-center gap-1 rounded-lg border border-card-border bg-surface px-1 py-2 text-[11px] font-medium ${MOVE_BUTTON_COLOR[c.status]}`}
+            >
+              <Icon className="h-4 w-4 shrink-0" />
+              <span className="truncate">{c.label}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Edit amount + payment */}
