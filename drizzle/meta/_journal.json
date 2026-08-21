@@ -71,6 +71,13 @@
       "when": 1787340709696,
       "tag": "0009_pale_mikhail_rasputin",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1787347608767,
+      "tag": "0010_young_rawhide_kid",
+      "breakpoints": true
     }
   ]
 }

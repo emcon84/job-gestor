@@ -17,7 +17,9 @@ export const clients = pgTable("clients", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
-  packThresholdCents: integer("pack_threshold_cents").notNull().default(1500000),
+  packThresholdCents: integer("pack_threshold_cents")
+    .notNull()
+    .default(150_000_00), // $150.000 ARS in cents
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
