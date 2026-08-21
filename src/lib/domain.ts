@@ -35,6 +35,42 @@ export interface Attachment {
   sizeBytes: number;
 }
 
+export type CommentAuthor = "client" | "owner";
+
+/** A single message in a task's comment thread. */
+export interface Comment {
+  id: string;
+  taskId: string;
+  body: string;
+  author: CommentAuthor;
+  createdAt: Date;
+}
+
+/** Fields required to add a comment to a task thread. */
+export interface NewComment {
+  taskId: string;
+  body: string;
+  author: CommentAuthor;
+}
+
+/** Maximum length of a comment body, enforced on the server. */
+export const COMMENT_MAX_LENGTH = 2000;
+
+/**
+ * Validates a comment body. Returns an error message, or null when valid.
+ * The caller is expected to have already trimmed the input.
+ */
+export function validateCommentBody(body: string): string | null {
+  const trimmed = body.trim();
+  if (!trimmed) {
+    return "El comentario no puede estar vacío.";
+  }
+  if (trimmed.length > COMMENT_MAX_LENGTH) {
+    return `El comentario es demasiado largo (máx. ${COMMENT_MAX_LENGTH} caracteres).`;
+  }
+  return null;
+}
+
 /**
  * A service in the owner-defined catalog. Each service has a fixed default cost
  * in ARS (integer cents). Tasks are assigned to a service, which auto-fills the
@@ -83,6 +119,8 @@ export interface Task {
   updatedAt: Date;
   completedAt: Date | null;
   attachments: Attachment[];
+  /** Comment thread for this task, oldest first. Loaded with the task. */
+  comments: Comment[];
 }
 
 /** Fields required to create a new task (client submits these). */

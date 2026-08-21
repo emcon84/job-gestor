@@ -15,6 +15,13 @@
       "when": 1787266963434,
       "tag": "0001_remarkable_edwin_jarvis",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787320422646,
+      "tag": "0002_lumpy_skrulls",
+      "breakpoints": true
     }
   ]
 }

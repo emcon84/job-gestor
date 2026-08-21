@@ -11,6 +11,8 @@
  * `DATABASE_URL`, so the app runs identically with or without a real database.
  */
 import type {
+  Comment,
+  NewComment,
   NewService,
   NewTask,
   Service,
@@ -21,14 +23,18 @@ import type {
 } from "./domain";
 
 export interface TaskRepository {
-  /** Lists all tasks, newest first. */
+  /** Lists all tasks, newest first, each carrying its attachments and comments. */
   listTasks(): Promise<Task[]>;
   /** Creates a task with its attachments and resolves its cost from a service. */
   createTask(input: NewTask): Promise<Task>;
   /** Updates a task (status/amount/payment). Overwrites — no history. */
   updateTask(id: string, update: TaskUpdate): Promise<Task | null>;
-  /** Deletes a task and its attachments. */
+  /** Deletes a task, its attachments, and its comments. */
   deleteTask(id: string): Promise<void>;
+  /** Lists a task's comments, oldest first. Empty when the task has none. */
+  listCommentsByTask(taskId: string): Promise<Comment[]>;
+  /** Adds a comment to a task. Returns null when the task doesn't exist. */
+  addComment(input: NewComment): Promise<Comment | null>;
 }
 
 /** Service catalog data-access contract. */

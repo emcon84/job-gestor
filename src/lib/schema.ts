@@ -65,9 +65,23 @@ export const attachments = pgTable("attachments", {
     .defaultNow(),
 });
 
+export const comments = pgTable("comments", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  taskId: uuid("task_id")
+    .notNull()
+    .references(() => tasks.id, { onDelete: "cascade" }),
+  body: text("body").notNull(),
+  author: text("author", { enum: ["client", "owner"] }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 export type TaskRow = typeof tasks.$inferSelect;
 export type NewTaskRow = typeof tasks.$inferInsert;
 export type AttachmentRow = typeof attachments.$inferSelect;
 export type NewAttachmentRow = typeof attachments.$inferInsert;
+export type CommentRow = typeof comments.$inferSelect;
+export type NewCommentRow = typeof comments.$inferInsert;
 export type ServiceRow = typeof services.$inferSelect;
 export type NewServiceRow = typeof services.$inferInsert;

@@ -1,6 +1,7 @@
 import { PRIORITY_LABELS, STATUS_LABELS, type Task } from "@/lib/domain";
 import { formatArs } from "@/lib/format";
 import AttachmentThumbs from "@/components/AttachmentThumbs";
+import PortalTaskItem from "@/components/PortalTaskItem";
 
 const PRIORITY_DOT: Record<string, string> = {
   low: "bg-muted",
@@ -28,13 +29,12 @@ export default function TaskList({ tasks }: { tasks: Task[] }) {
   return (
     <ul className="space-y-4">
       {tasks.map((task) => (
-        <li
-          key={task.id}
-          className="rounded-2xl border border-card-border bg-card p-5 space-y-3"
-        >
+        <PortalTaskItem key={task.id} task={task}>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h3 className="text-base font-semibold text-primary">{task.title}</h3>
+              <h3 className="text-base font-semibold text-primary">
+                {task.title}
+              </h3>
               <p className="text-sm text-muted">{task.area}</p>
             </div>
             <span
@@ -45,7 +45,9 @@ export default function TaskList({ tasks }: { tasks: Task[] }) {
             </span>
           </div>
 
-          <p className="whitespace-pre-wrap text-sm text-secondary">{task.description}</p>
+          <p className="whitespace-pre-wrap text-sm text-secondary">
+            {task.description}
+          </p>
 
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-secondary">
             <span>Prioridad: {PRIORITY_LABELS[task.priority]}</span>
@@ -60,7 +62,7 @@ export default function TaskList({ tasks }: { tasks: Task[] }) {
           {task.attachments.length > 0 && (
             <AttachmentThumbs attachments={task.attachments} sizeClass="h-16 w-16" />
           )}
-        </li>
+        </PortalTaskItem>
       ))}
     </ul>
   );

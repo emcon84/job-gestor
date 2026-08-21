@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { groupByStatus, resolveCompletedAt, type Task } from "./domain";
+import {
+  groupByStatus,
+  resolveCompletedAt,
+  validateCommentBody,
+  type Task,
+} from "./domain";
 
 function makeTask(overrides: Partial<Task> = {}): Task {
   return {
@@ -16,6 +21,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     updatedAt: new Date("2026-01-01"),
     completedAt: null,
     attachments: [],
+    comments: [],
     ...overrides,
   };
 }
@@ -67,5 +73,25 @@ describe("resolveCompletedAt", () => {
   it("keeps an existing completedAt when staying done", () => {
     const existing = new Date("2026-01-01");
     expect(resolveCompletedAt("done", now, existing)).toBe(now);
+  });
+});
+
+describe("validateCommentBody", () => {
+  it("accepts a valid non-empty body", () => {
+    expect(validateCommentBody("  Buen trabajo  ")).toBeNull();
+  });
+
+  it("rejects an empty or whitespace-only body", () => {
+    expect(validateCommentBody("")).toBe("El comentario no puede estar vacío.");
+    expect(validateCommentBody("   ")).toBe("El comentario no puede estar vacío.");
+  });
+
+  it("rejects a body over the max length", () => {
+    const long = "a".repeat(2001);
+    expect(validateCommentBody(long)).toContain("demasiado largo");
+  });
+
+  it("accepts a body exactly at the max length", () => {
+    expect(validateCommentBody("a".repeat(2000))).toBeNull();
   });
 });

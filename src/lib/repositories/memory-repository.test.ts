@@ -115,6 +115,59 @@ describe("MemoryRepository", () => {
   });
 });
 
+describe("MemoryRepository comments", () => {
+  let repo: MemoryRepository;
+
+  beforeEach(async () => {
+    repo = new MemoryRepository();
+    const svc = await repo.createService({ name: "mantenimiento", defaultCostArs: 10_000_00 });
+    sampleTask.defaultServiceId = svc.id;
+  });
+
+  it("adds a comment and lists it oldest first for the task", async () => {
+    const task = await repo.createTask(sampleTask());
+    await repo.addComment({ taskId: task.id, body: "primero", author: "client" });
+    await repo.addComment({ taskId: task.id, body: "segundo", author: "owner" });
+
+    const comments = await repo.listCommentsByTask(task.id);
+    expect(comments).toHaveLength(2);
+    expect(comments[0].body).toBe("primero");
+    expect(comments[0].author).toBe("client");
+    expect(comments[1].body).toBe("segundo");
+    expect(comments[1].author).toBe("owner");
+    expect(comments[0].id).toBeTruthy();
+    expect(comments[0].createdAt).toBeInstanceOf(Date);
+  });
+
+  it("returns comments attached to tasks loaded via listTasks", async () => {
+    const task = await repo.createTask(sampleTask());
+    await repo.addComment({ taskId: task.id, body: "hola", author: "client" });
+    const [listed] = await repo.listTasks();
+    expect(listed.comments).toHaveLength(1);
+    expect(listed.comments[0].body).toBe("hola");
+  });
+
+  it("returns an empty thread for a task without comments", async () => {
+    const task = await repo.createTask(sampleTask());
+    expect(await repo.listCommentsByTask(task.id)).toEqual([]);
+  });
+
+  it("returns null when adding a comment to a missing task", async () => {
+    expect(
+      await repo.addComment({ taskId: "missing", body: "x", author: "client" }),
+    ).toBeNull();
+  });
+
+  it("deleting a task removes its comments", async () => {
+    const task = await repo.createTask(sampleTask());
+    await repo.addComment({ taskId: task.id, body: "adios", author: "client" });
+    await repo.deleteTask(task.id);
+    expect(await repo.listCommentsByTask(task.id)).toEqual([]);
+    const tasks = await repo.listTasks();
+    expect(tasks).toHaveLength(0);
+  });
+});
+
 describe("MemoryRepository services", () => {
   let repo: MemoryRepository;
 

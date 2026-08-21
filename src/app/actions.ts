@@ -7,12 +7,13 @@ import { COOKIE_NAME, COOKIE_VALUE, verifyPassphrase } from "@/lib/auth";
 import { getUploadUrl, MAX_ATTACHMENT_BYTES, resolveImageType } from "@/lib/r2";
 import type {
   Attachment,
+  CommentAuthor,
   PaymentState,
   Priority,
   ServiceOption,
   TaskStatus,
 } from "@/lib/domain";
-import { PRIORITIES, STATUSES } from "@/lib/domain";
+import { PRIORITIES, STATUSES, validateCommentBody } from "@/lib/domain";
 import { parsePesosToCents } from "@/lib/format";
 import { getRepository } from "@/lib/store";
 import type { ActionResult, UnlockState, UploadUrlResult } from "@/lib/action-types";
@@ -233,6 +234,36 @@ export async function updateTask(formData: FormData): Promise<ActionResult> {
   revalidatePath("/owner");
   revalidatePath("/");
   return { ok: true, message: "Tarea actualizada." };
+}
+
+/**
+ * Adds a comment to a task thread. Works for BOTH the owner (unlocked cookie)
+ * and the client portal (shared link, no auth). The author is derived from the
+ * owner cookie, so a portal visitor posting is the normal client flow.
+ */
+export async function addComment(formData: FormData): Promise<ActionResult> {
+  const taskId = (formData.get("taskId") as string | null)?.trim() ?? "";
+  const body = (formData.get("body") as string | null)?.trim() ?? "";
+
+  if (!taskId) {
+    return { ok: false, error: "Falta la tarea." };
+  }
+  const bodyError = validateCommentBody(body);
+  if (bodyError) {
+    return { ok: false, error: bodyError };
+  }
+
+  const author: CommentAuthor = (await isOwner()) ? "owner" : "client";
+
+  const repo = await getRepository();
+  const created = await repo.addComment({ taskId, body, author });
+  if (!created) {
+    return { ok: false, error: "No se encontró la tarea." };
+  }
+
+  revalidatePath("/");
+  revalidatePath("/owner");
+  return { ok: true, message: "Comentario agregado." };
 }
 
 /**

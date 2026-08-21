@@ -3,8 +3,11 @@
  * Drizzle. Rows are mapped to the shared domain models. Edits overwrite current
  * values (no history), and deleting a task cascades to its attachments.
  */
-import { and, desc, eq, notExists } from "drizzle-orm";
+import { and, desc, eq, inArray, notExists } from "drizzle-orm";
 import type {
+  Comment,
+  CommentAuthor,
+  NewComment,
   NewService,
   NewTask,
   PaymentState,
@@ -19,10 +22,13 @@ import type {
 import { resolveCompletedAt } from "../domain";
 import type { ServiceRepository, TaskRepository } from "../repository";
 import { db } from "../db";
-import { attachments, services, tasks } from "../schema";
-import type { AttachmentRow } from "../schema";
+import { attachments, comments, services, tasks } from "../schema";
+import type { AttachmentRow, CommentRow } from "../schema";
 
-function mapTask(row: (typeof tasks.$inferSelect) & { att: AttachmentRow[] }): Task {
+function mapTask(
+  row: (typeof tasks.$inferSelect) & { att: AttachmentRow[] },
+  taskComments: Comment[],
+): Task {
   return {
     id: row.id,
     title: row.title,
@@ -43,7 +49,25 @@ function mapTask(row: (typeof tasks.$inferSelect) & { att: AttachmentRow[] }): T
       contentType: a.contentType,
       sizeBytes: a.sizeBytes,
     })),
+    comments: taskComments,
   };
+}
+
+function mapComment(row: CommentRow): Comment {
+  return {
+    id: row.id,
+    taskId: row.taskId,
+    body: row.body,
+    author: row.author as CommentAuthor,
+    createdAt: row.createdAt,
+  };
+}
+
+/** Sorts comments oldest first (thread order, newest at the bottom). */
+function sortComments(list: Comment[]): Comment[] {
+  return list.sort(
+    (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
+  );
 }
 
 function mapService(row: (typeof services.$inferSelect)): Service {
@@ -82,7 +106,29 @@ export class PostgresRepository implements TaskRepository, ServiceRepository {
       }
       grouped.set(t.id, entry);
     }
-    return [...grouped.values()].map((row) => mapTask(row));
+
+    // Batch-load all comment threads for the listed tasks (single IN query).
+    const taskIds = [...grouped.keys()];
+    const commentRows =
+      taskIds.length > 0
+        ? await db
+            .select()
+            .from(comments)
+            .where(inArray(comments.taskId, taskIds))
+        : [];
+    const commentsByTask = new Map<string, Comment[]>();
+    for (const c of commentRows) {
+      const list = commentsByTask.get(c.taskId) ?? [];
+      list.push(mapComment(c));
+      commentsByTask.set(c.taskId, list);
+    }
+    for (const list of commentsByTask.values()) {
+      sortComments(list);
+    }
+
+    return [...grouped.values()].map((row) =>
+      mapTask(row, commentsByTask.get(row.id) ?? []),
+    );
   }
 
   async createTask(input: NewTask): Promise<Task> {
@@ -113,18 +159,21 @@ export class PostgresRepository implements TaskRepository, ServiceRepository {
       return taskRow;
     });
 
-    return mapTask({
-      ...created,
-      att: input.attachments.map((a) => ({
-        id: a.id,
-        name: a.name,
-        url: a.url,
-        contentType: a.contentType,
-        sizeBytes: a.sizeBytes,
-        taskId: created.id,
-        createdAt: new Date(),
-      })),
-    });
+    return mapTask(
+      {
+        ...created,
+        att: input.attachments.map((a) => ({
+          id: a.id,
+          name: a.name,
+          url: a.url,
+          contentType: a.contentType,
+          sizeBytes: a.sizeBytes,
+          taskId: created.id,
+          createdAt: new Date(),
+        })),
+      },
+      [],
+    );
   }
 
   async updateTask(id: string, update: TaskUpdate): Promise<Task | null> {
@@ -155,13 +204,50 @@ export class PostgresRepository implements TaskRepository, ServiceRepository {
       .select()
       .from(attachments)
       .where(eq(attachments.taskId, id));
+    const commentRows = await db
+      .select()
+      .from(comments)
+      .where(eq(comments.taskId, id));
 
-    return mapTask({ ...updated, att: attRows });
+    return mapTask(
+      { ...updated, att: attRows },
+      sortComments(commentRows.map(mapComment)),
+    );
   }
 
   async deleteTask(id: string): Promise<void> {
-    // Cascade delete of attachments happens in the DB (onDelete: 'cascade').
+    // Cascade delete of attachments and comments happens in the DB
+    // (onDelete: 'cascade' on both tables).
     await db.delete(tasks).where(eq(tasks.id, id));
+  }
+
+  async listCommentsByTask(taskId: string): Promise<Comment[]> {
+    const rows = await db
+      .select()
+      .from(comments)
+      .where(eq(comments.taskId, taskId));
+    return sortComments(rows.map(mapComment));
+  }
+
+  async addComment(input: NewComment): Promise<Comment | null> {
+    // Guard the FK: return null instead of letting the insert raise when the
+    // task doesn't exist (mirrors the memory repository behavior).
+    const [existing] = await db
+      .select({ id: tasks.id })
+      .from(tasks)
+      .where(eq(tasks.id, input.taskId));
+    if (!existing) {
+      return null;
+    }
+    const [row] = await db
+      .insert(comments)
+      .values({
+        taskId: input.taskId,
+        body: input.body,
+        author: input.author,
+      })
+      .returning();
+    return mapComment(row);
   }
 
   async listServices(): Promise<ServiceOption[]> {

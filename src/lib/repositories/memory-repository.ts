@@ -6,6 +6,8 @@
  */
 import { randomUUID } from "node:crypto";
 import type {
+  Comment,
+  NewComment,
   NewService,
   NewTask,
   Service,
@@ -22,6 +24,8 @@ export class MemoryRepository implements TaskRepository, ServiceRepository {
   private services = new Map<string, Service>();
   private seq = 0;
   private order = new Map<string, number>();
+  private comments = new Map<string, { comment: Comment; seq: number }[]>();
+  private commentSeq = 0;
 
   async listTasks(): Promise<Task[]> {
     return [...this.tasks.values()].sort((a, b) => {
@@ -52,6 +56,7 @@ export class MemoryRepository implements TaskRepository, ServiceRepository {
       updatedAt: now,
       completedAt: null,
       attachments: input.attachments.map((a) => ({ ...a })),
+      comments: [],
     };
     this.tasks.set(task.id, task);
     this.order.set(task.id, this.seq++);
@@ -83,6 +88,42 @@ export class MemoryRepository implements TaskRepository, ServiceRepository {
   async deleteTask(id: string): Promise<void> {
     this.tasks.delete(id);
     this.order.delete(id);
+    this.comments.delete(id);
+  }
+
+  async listCommentsByTask(taskId: string): Promise<Comment[]> {
+    const list = this.comments.get(taskId) ?? [];
+    return list
+      .slice()
+      .sort((a, b) => {
+        const ta = a.comment.createdAt.getTime();
+        const tb = b.comment.createdAt.getTime();
+        if (ta !== tb) {
+          return ta - tb;
+        }
+        return a.seq - b.seq;
+      })
+      .map(({ comment }) => ({ ...comment }));
+  }
+
+  async addComment(input: NewComment): Promise<Comment | null> {
+    const stored = this.tasks.get(input.taskId);
+    if (!stored) {
+      return null;
+    }
+    const comment: Comment = {
+      id: randomUUID(),
+      taskId: input.taskId,
+      body: input.body,
+      author: input.author,
+      createdAt: new Date(),
+    };
+    const list = this.comments.get(input.taskId) ?? [];
+    list.push({ comment, seq: this.commentSeq++ });
+    this.comments.set(input.taskId, list);
+    // Keep the stored task's own thread in sync so listTasks returns it.
+    stored.comments.push(comment);
+    return { ...comment };
   }
 
   async listServices(): Promise<ServiceOption[]> {
