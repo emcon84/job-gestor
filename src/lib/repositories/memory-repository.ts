@@ -6,7 +6,10 @@
  */
 import { randomUUID } from "node:crypto";
 import type {
+  Client,
+  ClientUpdate,
   Comment,
+  NewClient,
   NewComment,
   NewPushSubscription,
   NewService,
@@ -19,9 +22,16 @@ import type {
   TaskUpdate,
 } from "../domain";
 import { resolveCompletedAt } from "../domain";
-import type { ServiceRepository, TaskRepository } from "../repository";
+import type {
+  ClientRepository,
+  ServiceRepository,
+  TaskRepository,
+} from "../repository";
 
-export class MemoryRepository implements TaskRepository, ServiceRepository {
+export class MemoryRepository
+  implements ClientRepository, TaskRepository, ServiceRepository
+{
+  private clients = new Map<string, Client>();
   private tasks = new Map<string, Task>();
   private services = new Map<string, Service>();
   private seq = 0;
@@ -30,16 +40,76 @@ export class MemoryRepository implements TaskRepository, ServiceRepository {
   private commentSeq = 0;
   private pushSubs = new Map<string, PushSubscription>();
 
-  async listTasks(): Promise<Task[]> {
-    return [...this.tasks.values()].sort((a, b) => {
-      const ta = a.createdAt.getTime();
-      const tb = b.createdAt.getTime();
-      if (ta !== tb) {
-        return tb - ta;
+  async listClients(): Promise<Client[]> {
+    return [...this.clients.values()].sort((a, b) =>
+      a.createdAt.getTime() - b.createdAt.getTime(),
+    );
+  }
+
+  async getClient(id: string): Promise<Client | null> {
+    return this.clients.get(id) ?? null;
+  }
+
+  async getClientBySlug(slug: string): Promise<Client | null> {
+    for (const c of this.clients.values()) {
+      if (c.slug === slug) {
+        return { ...c };
       }
-      // Stable tie-break by insertion order (newest inserted first).
-      return (this.order.get(b.id) ?? 0) - (this.order.get(a.id) ?? 0);
-    });
+    }
+    return null;
+  }
+
+  async createClient(input: NewClient): Promise<Client> {
+    const client: Client = {
+      id: randomUUID(),
+      name: input.name,
+      slug: input.slug,
+      packThresholdCents: input.packThresholdCents,
+      createdAt: new Date(),
+    };
+    this.clients.set(client.id, client);
+    return { ...client };
+  }
+
+  async updateClient(id: string, update: ClientUpdate): Promise<Client | null> {
+    const existing = this.clients.get(id);
+    if (!existing) {
+      return null;
+    }
+    const updated: Client = {
+      ...existing,
+      name: update.name ?? existing.name,
+      slug: update.slug ?? existing.slug,
+      packThresholdCents:
+        update.packThresholdCents ?? existing.packThresholdCents,
+    };
+    this.clients.set(id, updated);
+    return { ...updated };
+  }
+
+  async deleteClient(id: string): Promise<boolean> {
+    const hasTasks = [...this.tasks.values()].some((t) => t.clientId === id);
+    const hasServices = [...this.services.values()].some(
+      (s) => s.clientId === id,
+    );
+    if (hasTasks || hasServices) {
+      return false;
+    }
+    return this.clients.delete(id);
+  }
+
+  async listTasksByClient(clientId: string): Promise<Task[]> {
+    return [...this.tasks.values()]
+      .filter((t) => t.clientId === clientId)
+      .sort((a, b) => {
+        const ta = a.createdAt.getTime();
+        const tb = b.createdAt.getTime();
+        if (ta !== tb) {
+          return tb - ta;
+        }
+        // Stable tie-break by insertion order (newest inserted first).
+        return (this.order.get(b.id) ?? 0) - (this.order.get(a.id) ?? 0);
+      });
   }
 
   async getTask(id: string): Promise<Task | null> {
@@ -61,6 +131,7 @@ export class MemoryRepository implements TaskRepository, ServiceRepository {
       paymentState: null,
       paymentDueDate: null,
       serviceId: input.serviceId,
+      clientId: input.clientId,
       createdAt: now,
       updatedAt: now,
       completedAt: null,
@@ -157,12 +228,14 @@ export class MemoryRepository implements TaskRepository, ServiceRepository {
     return { ...comment };
   }
 
-  async listServices(): Promise<ServiceOption[]> {
-    return [...this.services.values()].map((s) => ({
-      id: s.id,
-      name: s.name,
-      defaultCostArs: s.defaultCostArs,
-    }));
+  async listServicesByClient(clientId: string): Promise<ServiceOption[]> {
+    return [...this.services.values()]
+      .filter((s) => s.clientId === clientId)
+      .map((s) => ({
+        id: s.id,
+        name: s.name,
+        defaultCostArs: s.defaultCostArs,
+      }));
   }
 
   async createService(input: NewService): Promise<Service> {
@@ -170,6 +243,7 @@ export class MemoryRepository implements TaskRepository, ServiceRepository {
       id: randomUUID(),
       name: input.name,
       defaultCostArs: input.defaultCostArs,
+      clientId: input.clientId,
       createdAt: new Date(),
     };
     this.services.set(service.id, service);

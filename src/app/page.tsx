@@ -1,18 +1,13 @@
-import SubmitForm from "@/components/SubmitForm";
-import TaskList from "@/components/TaskList";
-import ProgressBar from "@/components/ProgressBar";
+import Link from "next/link";
 import RefreshOnMount from "@/components/RefreshOnMount";
-import { Info } from "lucide-react";
 import { getRepository } from "@/lib/store";
-import { computePacks } from "@/lib/packs";
+import { formatArs } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const repo = await getRepository();
-  const tasks = await repo.listTasks();
-  const services = await repo.listServices();
-  const packSummary = computePacks(tasks);
+  const clients = await repo.listClients();
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-6 pb-28">
@@ -22,50 +17,44 @@ export default async function HomePage() {
           Tareas de Mantenimiento y Desarrollo
         </h1>
         <p className="text-sm text-secondary">
-          Enviá una tarea y seguí su estado acá.
+          Elegí tu portal de cliente para enviar y seguir tareas.
         </p>
       </header>
 
-      <section className="mb-10">
-        <h2 className="mb-3 text-lg font-semibold text-primary">Nueva tarea</h2>
-        <SubmitForm services={services} />
-      </section>
-
-      <section className="mb-10">
-        <h2 className="mb-3 text-lg font-semibold text-primary">Tu abono</h2>
-        <div
-          role="note"
-          className="mb-3 flex items-start gap-3 rounded-2xl border border-accent/40 bg-accent/10 p-4"
-        >
-          <Info className="mt-0.5 h-5 w-5 shrink-0 text-accent" aria-hidden />
-          <div className="space-y-1 text-sm text-secondary">
-            <p>
-              El abono es el acuerdo de costo mensual por mantenimiento. No es
-              estricto: puede sobrepasarse si es necesario.
-            </p>
-            <p>
-              En los meses donde no se realizan tareas no se cobra — solo se
-              cobra lo que se ve en este listado.
-            </p>
-          </div>
-        </div>
-        {tasks.length > 0 && <ProgressBar summary={packSummary} />}
-      </section>
-
-      <section>
-        <h2 className="mb-3 text-lg font-semibold text-primary">
-          Tareas enviadas
-        </h2>
-        <TaskList tasks={tasks} />
-      </section>
+      {clients.length === 0 ? (
+        <p className="rounded-2xl border border-card-border bg-card p-6 text-center text-muted">
+          Todavía no hay clientes.
+        </p>
+      ) : (
+        <ul className="grid gap-4 sm:grid-cols-2">
+          {clients.map((client) => (
+            <li key={client.id}>
+              <Link
+                href={`/c/${client.slug}`}
+                className="block rounded-2xl border border-card-border bg-card p-5 transition-colors hover:border-accent"
+              >
+                <h2 className="text-lg font-semibold text-primary">
+                  {client.name}
+                </h2>
+                <p className="mt-1 text-sm text-secondary">
+                  Abono: {formatArs(client.packThresholdCents)}
+                </p>
+                <span className="mt-3 inline-block text-sm font-medium text-accent">
+                  Portal del cliente →
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
 
       <footer className="mt-10 border-t border-card-border pt-4 text-center">
-        <a
+        <Link
           href="/owner"
           className="text-xs text-muted transition-colors hover:text-primary"
         >
           Acceso del propietario
-        </a>
+        </Link>
       </footer>
     </main>
   );

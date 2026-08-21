@@ -10,7 +10,6 @@ import type {
   CommentAuthor,
   PaymentState,
   Priority,
-  ServiceOption,
   TaskStatus,
 } from "@/lib/domain";
 import {
@@ -18,7 +17,9 @@ import {
   STATUSES,
   STATUS_LABELS,
   canClientMove,
+  isValidSlug,
   parseDueDate,
+  slugify,
   validateCommentAuthorName,
   validateCommentBody,
 } from "@/lib/domain";
@@ -32,6 +33,23 @@ export async function isOwner(): Promise<boolean> {
   const store = await cookies();
   const value = store.get(COOKIE_NAME)?.value;
   return value === COOKIE_VALUE;
+}
+
+/**
+ * Revalidates every route that can display this client's data: the public
+ * portal (`/c/{slug}`), the owner panel (`/owner/{slug}`), and the index pages
+ * (`/` client list, `/owner` owner list). Unknown/missing slugs degrade to a
+ * broad revalidate so no stale route survives a failed lookup.
+ */
+function revalidateClient(slug?: string | null): void {
+  if (slug) {
+    revalidatePath(`/c/${slug}`);
+    revalidatePath(`/owner/${slug}`);
+    revalidatePath("/");
+    revalidatePath("/owner");
+  } else {
+    revalidatePath("/", "layout");
+  }
 }
 
 /** Derives a rate-limit key from the request. */
@@ -65,13 +83,15 @@ export async function getUploadUrlAction(
 }
 
 /**
- * Creates a task. Client submits title/description/area/priority, an optional
+ * Creates a task for a specific client (the portal page passes its own
+ * `clientId`). Client submits title/description/area/priority, an optional
  * catalog `serviceId` (null = unclassified, the owner classifies later), plus a
  * JSON array of already-uploaded attachment records (name, url, contentType,
  * sizeBytes). The task amount is auto-filled from the service default when one
  * is assigned (server-resolved, authoritative); the owner may edit it later.
  */
 export async function createTask(formData: FormData): Promise<ActionResult> {
+  const clientId = (formData.get("clientId") as string | null)?.trim() ?? "";
   const title = (formData.get("title") as string | null)?.trim() ?? "";
   const description = (formData.get("description") as string | null)?.trim() ?? "";
   const area = (formData.get("area") as string | null)?.trim() ?? "";
@@ -80,6 +100,9 @@ export async function createTask(formData: FormData): Promise<ActionResult> {
     (formData.get("serviceId") as string | null)?.trim() || null;
   const attachmentsRaw = (formData.get("attachments") as string | null) ?? "[]";
 
+  if (!clientId) {
+    return { ok: false, error: "Falta el cliente." };
+  }
   if (!title) {
     return { ok: false, error: "El título es obligatorio." };
   }
@@ -120,6 +143,11 @@ export async function createTask(formData: FormData): Promise<ActionResult> {
   }
 
   const repo = await getRepository();
+  // The task must belong to a real client (portal passes its own id).
+  const client = await repo.getClient(clientId);
+  if (!client) {
+    return { ok: false, error: "El cliente no existe." };
+  }
   // When a service was chosen, it must exist in the catalog (server-resolved,
   // authoritative). Unclassified tasks (null) skip this check.
   if (serviceId && (await repo.resolveServiceCost(serviceId)) === null) {
@@ -131,23 +159,17 @@ export async function createTask(formData: FormData): Promise<ActionResult> {
     area,
     priority: validPriority,
     serviceId,
+    clientId,
     attachments,
   });
 
   await sendPushNotifications({ type: "task_created", body: title });
 
-  revalidatePath("/");
+  revalidateClient(client.slug);
   return { ok: true, message: "Tarea enviada correctamente." };
 }
 
-/** Returns the service catalog options for the submit form (client selector). */
-export async function getServices(): Promise<ServiceOption[]> {
-  const repo = await getRepository();
-  return repo.listServices();
-}
-
-/**
- * Unlocks the owner session with the passphrase. Issues an httpOnly cookie on
+/** Unlocks the owner session with the passphrase. Issues an httpOnly cookie on
  * success; failed attempts are rate-limited. Compatible with React's
  * `useActionState` so the unlock form can surface errors.
  */
@@ -277,8 +299,8 @@ export async function updateTask(formData: FormData): Promise<ActionResult> {
     body: `${updated.title}: ${STATUS_LABELS[updated.status]}`,
   });
 
-  revalidatePath("/owner");
-  revalidatePath("/");
+  const client = await repo.getClient(updated.clientId);
+  revalidateClient(client?.slug);
   return { ok: true, message: "Tarea actualizada." };
 }
 
@@ -314,8 +336,8 @@ export async function moveTaskStatusClient(
       type: "task_status",
       body: `${task.title}: ${STATUS_LABELS[statusRaw]}`,
     });
-    revalidatePath("/");
-    revalidatePath("/owner");
+    const client = await repo.getClient(task.clientId);
+    revalidateClient(client?.slug);
     return { ok: true, message: "Estado actualizado." };
   }
 
@@ -337,8 +359,8 @@ export async function moveTaskStatusClient(
     type: "task_status",
     body: `${task.title}: ${STATUS_LABELS[statusRaw]}`,
   });
-  revalidatePath("/");
-  revalidatePath("/owner");
+  const client = await repo.getClient(task.clientId);
+  revalidateClient(client?.slug);
   return { ok: true, message: "Estado actualizado." };
 }
 
@@ -382,10 +404,10 @@ export async function addComment(formData: FormData): Promise<ActionResult> {
     return { ok: false, error: "No se encontró la tarea." };
   }
 
+  const task = await repo.getTask(taskId);
+  const client = task ? await repo.getClient(task.clientId) : null;
   await sendPushNotifications({ type: "task_comment", body });
-
-  revalidatePath("/");
-  revalidatePath("/owner");
+  revalidateClient(client?.slug);
   return { ok: true, message: "Comentario agregado." };
 }
 
@@ -402,19 +424,24 @@ export async function deleteTask(formData: FormData): Promise<ActionResult> {
     return { ok: false, error: "Falta el id de la tarea." };
   }
   const repo = await getRepository();
+  const task = await repo.getTask(id);
   await repo.deleteTask(id);
-  revalidatePath("/owner");
-  revalidatePath("/");
+  const client = task ? await repo.getClient(task.clientId) : null;
+  revalidateClient(client?.slug);
   return { ok: true, message: "Tarea eliminada." };
 }
 
-/** Owner-only: creates a catalog service with a fixed default cost (pesos -> cents). */
+/** Owner-only: creates a catalog service for a client with a fixed default cost (pesos -> cents). */
 export async function createService(formData: FormData): Promise<ActionResult> {
   if (!(await isOwner())) {
     return { ok: false, error: "No autorizado." };
   }
+  const clientId = (formData.get("clientId") as string | null)?.trim() ?? "";
   const name = (formData.get("name") as string | null)?.trim() ?? "";
   const costRaw = (formData.get("defaultCostArs") as string | null) ?? "";
+  if (!clientId) {
+    return { ok: false, error: "Falta el cliente." };
+  }
   if (!name) {
     return { ok: false, error: "El nombre del servicio es obligatorio." };
   }
@@ -423,9 +450,12 @@ export async function createService(formData: FormData): Promise<ActionResult> {
     return { ok: false, error: "Costo inválido." };
   }
   const repo = await getRepository();
-  await repo.createService({ name, defaultCostArs: cents });
-  revalidatePath("/owner");
-  revalidatePath("/");
+  const client = await repo.getClient(clientId);
+  if (!client) {
+    return { ok: false, error: "El cliente no existe." };
+  }
+  await repo.createService({ name, defaultCostArs: cents, clientId });
+  revalidateClient(client.slug);
   return { ok: true, message: "Servicio creado." };
 }
 
@@ -455,8 +485,8 @@ export async function updateService(formData: FormData): Promise<ActionResult> {
   if (!updated) {
     return { ok: false, error: "No se encontró el servicio." };
   }
-  revalidatePath("/owner");
-  revalidatePath("/");
+  const client = await repo.getClient(updated.clientId);
+  revalidateClient(client?.slug);
   return { ok: true, message: "Servicio actualizado." };
 }
 
@@ -478,9 +508,128 @@ export async function deleteService(formData: FormData): Promise<ActionResult> {
         "No se puede eliminar: el servicio tiene tareas asignadas. Reasigná o eliminá esas tareas primero.",
     };
   }
-  revalidatePath("/owner");
-  revalidatePath("/");
+  revalidatePath("/owner", "layout");
   return { ok: true, message: "Servicio eliminado." };
+}
+
+/**
+ * Owner-only: creates a client. The slug defaults from the name via `slugify`
+ * but can be overridden by the owner. The pack threshold is parsed from pesos.
+ */
+export async function createClient(formData: FormData): Promise<ActionResult> {
+  if (!(await isOwner())) {
+    return { ok: false, error: "No autorizado." };
+  }
+  const name = (formData.get("name") as string | null)?.trim() ?? "";
+  const slugRaw = (formData.get("slug") as string | null)?.trim() ?? "";
+  const thresholdRaw = (formData.get("packThresholdArs") as string | null) ?? "";
+
+  if (!name) {
+    return { ok: false, error: "El nombre del cliente es obligatorio." };
+  }
+  const slug = slugRaw || slugify(name);
+  if (!slug) {
+    return { ok: false, error: "El slug del cliente es inválido." };
+  }
+  if (!isValidSlug(slug)) {
+    return {
+      ok: false,
+      error:
+        "El slug solo puede contener minúsculas, números y guiones simples (ej: mi-cliente).",
+    };
+  }
+  const cents = parsePesosToCents(thresholdRaw);
+  if (cents === null) {
+    return { ok: false, error: "Monto de abono inválido." };
+  }
+
+  const repo = await getRepository();
+  const existing = await repo.getClientBySlug(slug);
+  if (existing) {
+    return { ok: false, error: "Ya existe un cliente con ese slug." };
+  }
+  await repo.createClient({ name, slug, packThresholdCents: cents });
+  revalidatePath("/");
+  revalidatePath("/owner");
+  return { ok: true, message: "Cliente creado." };
+}
+
+/** Owner-only: updates a client's name / slug / pack threshold. */
+export async function updateClient(formData: FormData): Promise<ActionResult> {
+  if (!(await isOwner())) {
+    return { ok: false, error: "No autorizado." };
+  }
+  const id = (formData.get("id") as string | null) ?? "";
+  const name = (formData.get("name") as string | null)?.trim() ?? "";
+  const slugRaw = (formData.get("slug") as string | null)?.trim() ?? "";
+  const thresholdRaw = (formData.get("packThresholdArs") as string | null) ?? "";
+
+  if (!id) {
+    return { ok: false, error: "Falta el id del cliente." };
+  }
+  if (!name) {
+    return { ok: false, error: "El nombre del cliente es obligatorio." };
+  }
+  const slug = slugRaw || slugify(name);
+  if (!slug) {
+    return { ok: false, error: "El slug del cliente es inválido." };
+  }
+  if (!isValidSlug(slug)) {
+    return {
+      ok: false,
+      error:
+        "El slug solo puede contener minúsculas, números y guiones simples (ej: mi-cliente).",
+    };
+  }
+  const cents = parsePesosToCents(thresholdRaw);
+  if (cents === null) {
+    return { ok: false, error: "Monto de abono inválido." };
+  }
+
+  const repo = await getRepository();
+  const current = await repo.getClient(id);
+  if (!current) {
+    return { ok: false, error: "No se encontró el cliente." };
+  }
+  if (slug !== current.slug) {
+    const existing = await repo.getClientBySlug(slug);
+    if (existing && existing.id !== id) {
+      return { ok: false, error: "Ya existe un cliente con ese slug." };
+    }
+  }
+  const updated = await repo.updateClient(id, {
+    name,
+    slug,
+    packThresholdCents: cents,
+  });
+  if (!updated) {
+    return { ok: false, error: "No se encontró el cliente." };
+  }
+  revalidateClient(updated.slug);
+  return { ok: true, message: "Cliente actualizado." };
+}
+
+/** Owner-only: deletes a client. Refused while it still has tasks or services. */
+export async function deleteClient(formData: FormData): Promise<ActionResult> {
+  if (!(await isOwner())) {
+    return { ok: false, error: "No autorizado." };
+  }
+  const id = (formData.get("id") as string | null) ?? "";
+  if (!id) {
+    return { ok: false, error: "Falta el id del cliente." };
+  }
+  const repo = await getRepository();
+  const deleted = await repo.deleteClient(id);
+  if (!deleted) {
+    return {
+      ok: false,
+      error:
+        "No se puede eliminar: el cliente tiene tareas o servicios. Eliminá o reasigná todo primero.",
+    };
+  }
+  revalidatePath("/");
+  revalidatePath("/owner");
+  return { ok: true, message: "Cliente eliminado." };
 }
 
 /**

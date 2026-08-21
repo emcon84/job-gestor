@@ -5,8 +5,11 @@
  */
 import { and, desc, eq, inArray, notExists } from "drizzle-orm";
 import type {
+  Client,
+  ClientUpdate,
   Comment,
   CommentAuthor,
+  NewClient,
   NewComment,
   NewPushSubscription,
   NewService,
@@ -22,10 +25,26 @@ import type {
   TaskUpdate,
 } from "../domain";
 import { resolveCompletedAt } from "../domain";
-import type { ServiceRepository, TaskRepository } from "../repository";
+import type {
+  ClientRepository,
+  ServiceRepository,
+  TaskRepository,
+} from "../repository";
 import { db } from "../db";
-import { attachments, comments, pushSubscriptions, services, tasks } from "../schema";
-import type { AttachmentRow, CommentRow, PushSubscriptionRow } from "../schema";
+import {
+  attachments,
+  clients,
+  comments,
+  pushSubscriptions,
+  services,
+  tasks,
+} from "../schema";
+import type {
+  AttachmentRow,
+  ClientRow,
+  CommentRow,
+  PushSubscriptionRow,
+} from "../schema";
 
 function mapTask(
   row: (typeof tasks.$inferSelect) & { att: AttachmentRow[] },
@@ -43,6 +62,7 @@ function mapTask(
     paymentState: row.paymentState as PaymentState | null,
     paymentDueDate: row.paymentDueDate,
     serviceId: row.serviceId,
+    clientId: row.clientId,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     completedAt: row.completedAt,
@@ -80,6 +100,17 @@ function mapService(row: (typeof services.$inferSelect)): Service {
     id: row.id,
     name: row.name,
     defaultCostArs: row.defaultCostArs,
+    clientId: row.clientId,
+    createdAt: row.createdAt,
+  };
+}
+
+function mapClient(row: ClientRow): Client {
+  return {
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    packThresholdCents: row.packThresholdCents,
     createdAt: row.createdAt,
   };
 }
@@ -102,12 +133,82 @@ function mapPushSubscription(row: PushSubscriptionRow): PushSubscription {
   };
 }
 
-export class PostgresRepository implements TaskRepository, ServiceRepository {
-  async listTasks(): Promise<Task[]> {
+export class PostgresRepository
+  implements ClientRepository, TaskRepository, ServiceRepository
+{
+  async listClients(): Promise<Client[]> {
+    const rows = await db.select().from(clients).orderBy(clients.createdAt);
+    return rows.map(mapClient);
+  }
+
+  async getClient(id: string): Promise<Client | null> {
+    const [row] = await db.select().from(clients).where(eq(clients.id, id));
+    return row ? mapClient(row) : null;
+  }
+
+  async getClientBySlug(slug: string): Promise<Client | null> {
+    const [row] = await db.select().from(clients).where(eq(clients.slug, slug));
+    return row ? mapClient(row) : null;
+  }
+
+  async createClient(input: NewClient): Promise<Client> {
+    const [row] = await db
+      .insert(clients)
+      .values({
+        name: input.name,
+        slug: input.slug,
+        packThresholdCents: input.packThresholdCents,
+      })
+      .returning();
+    return mapClient(row);
+  }
+
+  async updateClient(id: string, update: ClientUpdate): Promise<Client | null> {
+    const [existing] = await db.select().from(clients).where(eq(clients.id, id));
+    if (!existing) {
+      return null;
+    }
+    const [row] = await db
+      .update(clients)
+      .set({
+        name: update.name ?? existing.name,
+        slug: update.slug ?? existing.slug,
+        packThresholdCents:
+          update.packThresholdCents ?? existing.packThresholdCents,
+      })
+      .where(eq(clients.id, id))
+      .returning();
+    return mapClient(row);
+  }
+
+  async deleteClient(id: string): Promise<boolean> {
+    // Guard: never delete a client that still has tasks or services.
+    const [row] = await db
+      .delete(clients)
+      .where(
+        and(
+          eq(clients.id, id),
+          notExists(
+            db.select({ id: tasks.id }).from(tasks).where(eq(tasks.clientId, id)),
+          ),
+          notExists(
+            db
+              .select({ id: services.id })
+              .from(services)
+              .where(eq(services.clientId, id)),
+          ),
+        ),
+      )
+      .returning({ id: clients.id });
+    return Boolean(row);
+  }
+
+  async listTasksByClient(clientId: string): Promise<Task[]> {
     const rows = await db
       .select()
       .from(tasks)
       .leftJoin(attachments, eq(attachments.taskId, tasks.id))
+      .where(eq(tasks.clientId, clientId))
       .orderBy(desc(tasks.createdAt));
 
     const grouped = new Map<
@@ -175,6 +276,7 @@ export class PostgresRepository implements TaskRepository, ServiceRepository {
           area: input.area,
           priority: input.priority,
           serviceId: input.serviceId,
+          clientId: input.clientId,
           // Resolve the cost from the assigned service default (authoritative);
           // unclassified tasks start at 0.
           amountArs: (await this.resolveServiceCost(input.serviceId)) ?? 0,
@@ -308,10 +410,11 @@ export class PostgresRepository implements TaskRepository, ServiceRepository {
     return mapComment(row);
   }
 
-  async listServices(): Promise<ServiceOption[]> {
+  async listServicesByClient(clientId: string): Promise<ServiceOption[]> {
     const rows = await db
       .select()
       .from(services)
+      .where(eq(services.clientId, clientId))
       .orderBy(services.createdAt);
     return rows.map(mapServiceOption);
   }
@@ -322,6 +425,7 @@ export class PostgresRepository implements TaskRepository, ServiceRepository {
       .values({
         name: input.name,
         defaultCostArs: input.defaultCostArs,
+        clientId: input.clientId,
       })
       .returning();
     return mapService(row);

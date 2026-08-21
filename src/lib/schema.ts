@@ -13,10 +13,23 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
+export const clients = pgTable("clients", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  packThresholdCents: integer("pack_threshold_cents").notNull().default(1500000),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 export const services = pgTable("services", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
   defaultCostArs: integer("default_cost_ars").notNull(), // cents
+  clientId: uuid("client_id")
+    .notNull()
+    .references(() => clients.id),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -42,6 +55,9 @@ export const tasks = pgTable("tasks", {
   paymentState: text("payment_state", { enum: ["paid", "pending"] }),
   paymentDueDate: timestamp("payment_due_date", { withTimezone: true }),
   serviceId: uuid("service_id").references(() => services.id),
+  clientId: uuid("client_id")
+    .notNull()
+    .references(() => clients.id),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -105,3 +121,5 @@ export type ServiceRow = typeof services.$inferSelect;
 export type NewServiceRow = typeof services.$inferInsert;
 export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
 export type NewPushSubscriptionRow = typeof pushSubscriptions.$inferInsert;
+export type ClientRow = typeof clients.$inferSelect;
+export type NewClientRow = typeof clients.$inferInsert;

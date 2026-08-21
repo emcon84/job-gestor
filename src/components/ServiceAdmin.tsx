@@ -11,7 +11,13 @@ import { centsToPesosInput } from "@/lib/format";
  * Owner catalog CRUD. Each service has a name and a fixed default cost in ARS.
  * List, create, edit, and delete services from the /owner area.
  */
-export default function ServiceAdmin({ services }: { services: ServiceOption[] }) {
+export default function ServiceAdmin({
+  clientId,
+  services,
+}: {
+  clientId: string;
+  services: ServiceOption[];
+}) {
   const router = useRouter();
   // Collapsed by default so the catalog never pushes the kanban off-screen.
   const [collapsed, setCollapsed] = useState(true);
@@ -26,6 +32,7 @@ export default function ServiceAdmin({ services }: { services: ServiceOption[] }
     const fd = new FormData();
     fd.set("name", name);
     fd.set("defaultCostArs", cost);
+    fd.set("clientId", clientId);
     const r: ActionResult = await createService(fd);
     setMsg(r.ok ? { kind: "success", text: r.message ?? "Creado." } : { kind: "error", text: r.error ?? "Error." });
     if (r.ok) {

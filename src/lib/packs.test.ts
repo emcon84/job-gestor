@@ -15,6 +15,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     paymentState: null,
     paymentDueDate: null,
     serviceId: "s1",
+    clientId: "c1",
     createdAt: new Date("2026-01-01T00:00:00Z"),
     updatedAt: new Date("2026-01-01T00:00:00Z"),
     completedAt: null,

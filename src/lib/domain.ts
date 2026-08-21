@@ -31,6 +31,56 @@ export const STATUSES: TaskStatus[] = ["pending", "in_progress", "revision", "do
 export const MAX_CLIENT_MOVES = 5;
 
 /**
+ * A client (customer) that owns its own portal, services, and tasks. Each has a
+ * human-readable URL slug and its own pack (abono) threshold.
+ */
+export interface Client {
+  id: string;
+  name: string;
+  slug: string;
+  /** Pack close threshold in ARS, stored as integer cents. */
+  packThresholdCents: number;
+  createdAt: Date;
+}
+
+/** Fields required to create a new client. */
+export interface NewClient {
+  name: string;
+  slug: string;
+  packThresholdCents: number;
+}
+
+/** Fields the owner may edit on an existing client. */
+export interface ClientUpdate {
+  name?: string;
+  slug?: string;
+  packThresholdCents?: number;
+}
+
+/**
+ * Lowercases a name and converts it to a URL-safe slug: removes accents,
+ * replaces any run of non-alphanumeric characters with a single dash, and trims
+ * leading/trailing dashes. Empty/whitespace-only input yields "".
+ * Example: "Cliente 1" -> "cliente-1", "José García!" -> "jose-garcia".
+ */
+export function slugify(name: string): string {
+  return name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+/**
+ * Whether a client slug is well-formed for a portal URL.
+ * Matches ^[a-z0-9]+(-[a-z0-9]+)*$ (lowercase letters/digits, single dashes).
+ */
+export function isValidSlug(slug: string): boolean {
+  return /^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug);
+}
+
+/**
  * Whether the client portal may still move this task's status. Blocked once the
  * task is done or the client has used all its moves.
  */
@@ -113,6 +163,8 @@ export interface Service {
   name: string;
   /** Default cost in ARS, stored as integer cents. */
   defaultCostArs: number;
+  /** The client this service belongs to. */
+  clientId: string;
   createdAt: Date;
 }
 
@@ -120,6 +172,7 @@ export interface Service {
 export interface NewService {
   name: string;
   defaultCostArs: number;
+  clientId: string;
 }
 
 /** Fields the owner may edit on an existing service. */
@@ -151,6 +204,8 @@ export interface Task {
   paymentDueDate: Date | null;
   /** The catalog service this task is assigned to (null = unclassified). */
   serviceId: string | null;
+  /** The client this task belongs to. */
+  clientId: string;
   createdAt: Date;
   updatedAt: Date;
   completedAt: Date | null;
@@ -167,6 +222,8 @@ export interface NewTask {
   priority: Priority;
   /** Catalog service assigned by the client on submit (null = unclassified). */
   serviceId: string | null;
+  /** The client this task belongs to. */
+  clientId: string;
   attachments: Attachment[];
 }
 

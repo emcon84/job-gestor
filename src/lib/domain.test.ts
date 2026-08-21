@@ -4,8 +4,10 @@ import {
   canClientMove,
   groupByStatus,
   isDueDateOverdue,
+  isValidSlug,
   parseDueDate,
   resolveCompletedAt,
+  slugify,
   validateCommentAuthorName,
   validateCommentBody,
   type Task,
@@ -24,6 +26,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     paymentState: null,
     paymentDueDate: null,
     serviceId: "s1",
+    clientId: "c1",
     createdAt: new Date("2026-01-01"),
     updatedAt: new Date("2026-01-01"),
     completedAt: null,
@@ -32,6 +35,53 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     ...overrides,
   };
 }
+
+describe("slugify", () => {
+  it("lowercases and replaces spaces with dashes", () => {
+    expect(slugify("Cliente 1")).toBe("cliente-1");
+  });
+
+  it("removes accents", () => {
+    expect(slugify("José García")).toBe("jose-garcia");
+  });
+
+  it("collapses runs of non-alphanumeric characters into a single dash", () => {
+    expect(slugify("Mi   Cliente!!")).toBe("mi-cliente");
+  });
+
+  it("trims leading and trailing dashes", () => {
+    expect(slugify("  -Cliente-  ")).toBe("cliente");
+  });
+
+  it("returns an empty string for empty or whitespace-only input", () => {
+    expect(slugify("")).toBe("");
+    expect(slugify("   ")).toBe("");
+  });
+
+  it("keeps numbers", () => {
+    expect(slugify("Cliente 123")).toBe("cliente-123");
+  });
+});
+
+describe("isValidSlug", () => {
+  it("accepts well-formed slugs", () => {
+    expect(isValidSlug("cliente-1")).toBe(true);
+    expect(isValidSlug("abc")).toBe(true);
+    expect(isValidSlug("mi-cliente")).toBe(true);
+  });
+
+  it("rejects uppercase, double dashes, leading/trailing dashes and special chars", () => {
+    expect(isValidSlug("Cliente-1")).toBe(false);
+    expect(isValidSlug("mi--cliente")).toBe(false);
+    expect(isValidSlug("-cliente")).toBe(false);
+    expect(isValidSlug("cliente-")).toBe(false);
+    expect(isValidSlug("mi_cliente")).toBe(false);
+  });
+
+  it("rejects empty input", () => {
+    expect(isValidSlug("")).toBe(false);
+  });
+});
 
 describe("groupByStatus", () => {
   it("groups tasks into the three kanban columns", () => {

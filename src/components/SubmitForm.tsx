@@ -12,7 +12,13 @@ const ACCEPT =
   "application/zip,application/x-zip-compressed,application/x-rar-compressed," +
   "application/x-7z-compressed,application/gzip,application/x-tar";
 
-export default function SubmitForm({ services }: { services: ServiceOption[] }) {
+export default function SubmitForm({
+  services,
+  clientId,
+}: {
+  services: ServiceOption[];
+  clientId: string;
+}) {
   const router = useRouter();
   const [files, setFiles] = useState<File[]>([]);
   const [status, setStatus] = useState<{ kind: "idle" | "error" | "success"; text: string }>(
@@ -90,6 +96,7 @@ export default function SubmitForm({ services }: { services: ServiceOption[] }) 
 
       const data = new FormData(form);
       data.set("attachments", JSON.stringify(attachments));
+      data.set("clientId", clientId);
 
       const result: ActionResult = await createTask(data);
       if (!result.ok) {

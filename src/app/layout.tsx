@@ -28,7 +28,7 @@ const montserrat = Montserrat({
 export const metadata: Metadata = {
   title: "Job Gestor — Tareas de mantenimiento",
   description:
-    "Panel de tareas de mantenimiento para un único cliente: envío y seguimiento de estado, con tablero para el propietario.",
+    "Panel de tareas de mantenimiento por cliente: envío y seguimiento de estado, con tablero para el propietario.",
 };
 
 export default function RootLayout({
