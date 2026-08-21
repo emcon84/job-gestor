@@ -2,11 +2,13 @@ import { cookies } from "next/headers";
 import KanbanBoard from "@/components/KanbanBoard";
 import OwnerUnlockForm from "@/components/OwnerUnlockForm";
 import ProgressBar from "@/components/ProgressBar";
+import RefreshOnMount from "@/components/RefreshOnMount";
 import ServiceAdmin from "@/components/ServiceAdmin";
 import { lockOwner } from "@/app/actions";
 import { COOKIE_VALUE } from "@/lib/auth";
 import { groupByStatus } from "@/lib/domain";
 import { computePacks } from "@/lib/packs";
+import { r2PublicBaseUrlIssue } from "@/lib/r2";
 import { getRepository } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
@@ -36,9 +38,21 @@ export default async function OwnerPage() {
   const services = await repo.listServices();
   const columns = groupByStatus(tasks);
   const packSummary = computePacks(tasks);
+  const r2Issue = r2PublicBaseUrlIssue();
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-6">
+      <RefreshOnMount />
+
+      {r2Issue && (
+        <div
+          role="alert"
+          className="mb-6 rounded border border-status-urgent/40 bg-error/10 p-3 text-sm text-error"
+        >
+          {r2Issue}
+        </div>
+      )}
+
       <header className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-primary">Tablero</h1>

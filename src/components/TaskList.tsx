@@ -1,6 +1,6 @@
-import Image from "next/image";
 import { PRIORITY_LABELS, STATUS_LABELS, type Task } from "@/lib/domain";
 import { formatArs } from "@/lib/format";
+import AttachmentThumbs from "@/components/AttachmentThumbs";
 
 const PRIORITY_DOT: Record<string, string> = {
   low: "bg-muted",
@@ -57,27 +57,7 @@ export default function TaskList({ tasks }: { tasks: Task[] }) {
           </div>
 
           {task.attachments.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {task.attachments.map((a) => (
-                <a
-                  key={a.id}
-                  href={a.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-lg border border-card-border p-1 hover:border-accent"
-                  aria-label={a.name}
-                >
-                  <Image
-                    src={a.url}
-                    alt={a.name}
-                    width={64}
-                    height={64}
-                    unoptimized
-                    className="h-16 w-16 rounded object-cover"
-                  />
-                </a>
-              ))}
-            </div>
+            <AttachmentThumbs attachments={task.attachments} sizeClass="h-16 w-16" />
           )}
         </li>
       ))}

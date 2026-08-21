@@ -79,6 +79,21 @@ export function r2PublicBaseUrlOrNull(): string | null {
   return base.replace(/\/+$/, "");
 }
 
+/**
+ * Returns a short Spanish message explaining why attachments can't be served
+ * publicly, or null when everything needed is configured. Used to surface a
+ * visible warning on the owner page so misconfiguration isn't silent.
+ */
+export function r2PublicBaseUrlIssue(): string | null {
+  if (!isR2Configured()) {
+    return "Falta configurar las credenciales de R2 (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY y R2_BUCKET) en Vercel.";
+  }
+  if (!r2PublicBaseUrlOrNull()) {
+    return "Falta configurar R2_PUBLIC_BASE_URL en Vercel con la URL pública https://pub-<hash>.r2.dev — sin ella las imágenes no se guardan y aparecen rotas.";
+  }
+  return null;
+}
+
 export interface UploadUrl {
   uploadUrl: string;
   objectKey: string;

@@ -1,6 +1,7 @@
 import SubmitForm from "@/components/SubmitForm";
 import TaskList from "@/components/TaskList";
 import ProgressBar from "@/components/ProgressBar";
+import RefreshOnMount from "@/components/RefreshOnMount";
 import { getRepository } from "@/lib/store";
 import { computePacks } from "@/lib/packs";
 
@@ -14,6 +15,7 @@ export default async function HomePage() {
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-6 pb-28">
+      <RefreshOnMount />
       <header className="mb-6">
         <h1 className="text-2xl font-bold text-primary">Mis tareas</h1>
         <p className="text-sm text-secondary">

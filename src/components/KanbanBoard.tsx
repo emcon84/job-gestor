@@ -1,11 +1,11 @@
 "use client";
 
 import { useRef, useState } from "react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { deleteTask, updateTask } from "@/app/actions";
 import { type Task, type TaskStatus } from "@/lib/domain";
 import { formatArs } from "@/lib/format";
+import AttachmentThumbs from "@/components/AttachmentThumbs";
 
 const COLUMNS: { status: TaskStatus; label: string }[] = [
   { status: "pending", label: "Pendiente" },
@@ -117,20 +117,7 @@ function KanbanCard({ task }: { task: Task }) {
       )}
 
       {task.attachments.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {task.attachments.map((a) => (
-            <a key={a.id} href={a.url} target="_blank" rel="noopener noreferrer">
-              <Image
-                src={a.url}
-                alt={a.name}
-                width={40}
-                height={40}
-                unoptimized
-                className="h-10 w-10 rounded object-cover"
-              />
-            </a>
-          ))}
-        </div>
+        <AttachmentThumbs attachments={task.attachments} sizeClass="h-10 w-10" />
       )}
 
       {/* Move status */}
