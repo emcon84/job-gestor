@@ -82,6 +82,21 @@ export const comments = pgTable("comments", {
     .defaultNow(),
 });
 
+/**
+ * Browser Web Push subscriptions (endpoint + encryption keys). One row per
+ * device/browser that opted in on the shared portal. Upserted by endpoint so
+ * re-subscribing with the same push service never duplicates a row.
+ */
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  endpoint: text("endpoint").notNull().unique(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 export type TaskRow = typeof tasks.$inferSelect;
 export type NewTaskRow = typeof tasks.$inferInsert;
 export type AttachmentRow = typeof attachments.$inferSelect;
@@ -90,3 +105,5 @@ export type CommentRow = typeof comments.$inferSelect;
 export type NewCommentRow = typeof comments.$inferInsert;
 export type ServiceRow = typeof services.$inferSelect;
 export type NewServiceRow = typeof services.$inferInsert;
+export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
+export type NewPushSubscriptionRow = typeof pushSubscriptions.$inferInsert;

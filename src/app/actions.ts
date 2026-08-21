@@ -16,6 +16,7 @@ import type {
 import {
   PRIORITIES,
   STATUSES,
+  STATUS_LABELS,
   canClientMove,
   parseDueDate,
   validateCommentAuthorName,
@@ -23,6 +24,7 @@ import {
 } from "@/lib/domain";
 import { parsePesosToCents } from "@/lib/format";
 import { getRepository } from "@/lib/store";
+import { sendPushNotifications } from "@/lib/push";
 import type { ActionResult, UnlockState, UploadUrlResult } from "@/lib/action-types";
 
 /** Reads whether the current request carries a valid owner cookie. */
@@ -131,6 +133,8 @@ export async function createTask(formData: FormData): Promise<ActionResult> {
     serviceId,
     attachments,
   });
+
+  await sendPushNotifications({ type: "task_created", body: title });
 
   revalidatePath("/");
   return { ok: true, message: "Tarea enviada correctamente." };
@@ -252,6 +256,11 @@ export async function updateTask(formData: FormData): Promise<ActionResult> {
     return { ok: false, error: "No se encontró la tarea." };
   }
 
+  await sendPushNotifications({
+    type: "task_status",
+    body: `${updated.title}: ${STATUS_LABELS[updated.status]}`,
+  });
+
   revalidatePath("/owner");
   revalidatePath("/");
   return { ok: true, message: "Tarea actualizada." };
@@ -285,6 +294,10 @@ export async function moveTaskStatusClient(
 
   if (await isOwner()) {
     await repo.updateTask(id, { status: statusRaw });
+    await sendPushNotifications({
+      type: "task_status",
+      body: `${task.title}: ${STATUS_LABELS[statusRaw]}`,
+    });
     revalidatePath("/");
     revalidatePath("/owner");
     return { ok: true, message: "Estado actualizado." };
@@ -303,6 +316,10 @@ export async function moveTaskStatusClient(
   await repo.updateTask(id, {
     status: statusRaw,
     clientMoveCount: task.clientMoveCount + 1,
+  });
+  await sendPushNotifications({
+    type: "task_status",
+    body: `${task.title}: ${STATUS_LABELS[statusRaw]}`,
   });
   revalidatePath("/");
   revalidatePath("/owner");
@@ -348,6 +365,8 @@ export async function addComment(formData: FormData): Promise<ActionResult> {
   if (!created) {
     return { ok: false, error: "No se encontró la tarea." };
   }
+
+  await sendPushNotifications({ type: "task_comment", body });
 
   revalidatePath("/");
   revalidatePath("/owner");
@@ -446,4 +465,54 @@ export async function deleteService(formData: FormData): Promise<ActionResult> {
   revalidatePath("/owner");
   revalidatePath("/");
   return { ok: true, message: "Servicio eliminado." };
+}
+
+/**
+ * Stores a browser Web Push subscription for this device. Safe for any caller
+ * (the portal is shared-link). Expects a JSON body:
+ * `{ "endpoint": string, "p256dh": string, "auth": string }`.
+ */
+export async function subscribePush(formData: FormData): Promise<ActionResult> {
+  const raw = (formData.get("subscription") as string | null) ?? "";
+  let parsed: { endpoint?: unknown; p256dh?: unknown; auth?: unknown };
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { ok: false, error: "Suscripción inválida." };
+  }
+  const { endpoint, p256dh, auth } = parsed;
+  if (
+    typeof endpoint !== "string" ||
+    !endpoint ||
+    typeof p256dh !== "string" ||
+    !p256dh ||
+    typeof auth !== "string" ||
+    !auth
+  ) {
+    return { ok: false, error: "Suscripción inválida." };
+  }
+  const repo = await getRepository();
+  await repo.addPushSubscription({ endpoint, p256dh, auth });
+  return { ok: true, message: "Notificaciones activadas." };
+}
+
+/**
+ * Removes a stored Web Push subscription by endpoint.
+ * Safe for any caller. Expects a JSON body: `{ "endpoint": string }`.
+ */
+export async function unsubscribePush(formData: FormData): Promise<ActionResult> {
+  const raw = (formData.get("subscription") as string | null) ?? "";
+  let parsed: { endpoint?: unknown };
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { ok: false, error: "Suscripción inválida." };
+  }
+  const { endpoint } = parsed;
+  if (typeof endpoint !== "string" || !endpoint) {
+    return { ok: false, error: "Suscripción inválida." };
+  }
+  const repo = await getRepository();
+  await repo.deletePushSubscriptionByEndpoint(endpoint);
+  return { ok: true, message: "Notificaciones desactivadas." };
 }

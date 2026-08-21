@@ -8,10 +8,12 @@ import type {
   Comment,
   CommentAuthor,
   NewComment,
+  NewPushSubscription,
   NewService,
   NewTask,
   PaymentState,
   Priority,
+  PushSubscription,
   Service,
   ServiceOption,
   ServiceUpdate,
@@ -22,8 +24,8 @@ import type {
 import { resolveCompletedAt } from "../domain";
 import type { ServiceRepository, TaskRepository } from "../repository";
 import { db } from "../db";
-import { attachments, comments, services, tasks } from "../schema";
-import type { AttachmentRow, CommentRow } from "../schema";
+import { attachments, comments, pushSubscriptions, services, tasks } from "../schema";
+import type { AttachmentRow, CommentRow, PushSubscriptionRow } from "../schema";
 
 function mapTask(
   row: (typeof tasks.$inferSelect) & { att: AttachmentRow[] },
@@ -87,6 +89,16 @@ function mapServiceOption(row: (typeof services.$inferSelect)): ServiceOption {
     id: row.id,
     name: row.name,
     defaultCostArs: row.defaultCostArs,
+  };
+}
+
+function mapPushSubscription(row: PushSubscriptionRow): PushSubscription {
+  return {
+    id: row.id,
+    endpoint: row.endpoint,
+    p256dh: row.p256dh,
+    auth: row.auth,
+    createdAt: row.createdAt,
   };
 }
 
@@ -342,5 +354,42 @@ export class PostgresRepository implements TaskRepository, ServiceRepository {
       .from(services)
       .where(eq(services.id, id));
     return row?.defaultCostArs ?? null;
+  }
+
+  async listPushSubscriptions(): Promise<PushSubscription[]> {
+    const rows = await db
+      .select()
+      .from(pushSubscriptions)
+      .orderBy(pushSubscriptions.createdAt);
+    return rows.map(mapPushSubscription);
+  }
+
+  async addPushSubscription(
+    input: NewPushSubscription,
+  ): Promise<PushSubscription> {
+    // Upsert by endpoint (unique) so re-subscribing never duplicates a row and
+    // refreshes the encryption keys in place.
+    const [row] = await db
+      .insert(pushSubscriptions)
+      .values(input)
+      .onConflictDoNothing({ target: pushSubscriptions.endpoint })
+      .returning();
+
+    if (row) {
+      return mapPushSubscription(row);
+    }
+
+    // Conflict on the endpoint — return the existing row (already subscribed).
+    const [existing] = await db
+      .select()
+      .from(pushSubscriptions)
+      .where(eq(pushSubscriptions.endpoint, input.endpoint));
+    return mapPushSubscription(existing!);
+  }
+
+  async deletePushSubscriptionByEndpoint(endpoint: string): Promise<void> {
+    await db
+      .delete(pushSubscriptions)
+      .where(eq(pushSubscriptions.endpoint, endpoint));
   }
 }

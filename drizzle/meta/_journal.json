@@ -43,6 +43,13 @@
       "when": 1787323068488,
       "tag": "0005_optimal_vindicator",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787323856124,
+      "tag": "0006_ambiguous_meltdown",
+      "breakpoints": true
     }
   ]
 }

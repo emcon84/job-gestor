@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import { Montserrat } from "next/font/google";
 import ThemeToggle from "@/components/ThemeToggle";
+import PwaRegister from "@/components/PwaRegister";
+import PushSubscribeButton from "@/components/PushSubscribeButton";
 import "./globals.css";
 
 const themeInitScript = `
@@ -45,6 +47,8 @@ export default function RootLayout({
       </head>
       <body className={`${montserrat.variable} font-sans antialiased`}>
         {children}
+        <PwaRegister />
+        <PushSubscribeButton />
         <ThemeToggle />
       </body>
     </html>

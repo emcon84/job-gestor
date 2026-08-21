@@ -265,3 +265,51 @@ describe("MemoryRepository services", () => {
     expect(await repo.resolveServiceCost("nope")).toBeNull();
   });
 });
+
+describe("MemoryRepository push subscriptions", () => {
+  let repo: MemoryRepository;
+
+  beforeEach(() => {
+    repo = new MemoryRepository();
+  });
+
+  it("adds, lists, and deletes a push subscription", async () => {
+    const sub = await repo.addPushSubscription({
+      endpoint: "https://push.example.com/a",
+      p256dh: "p1",
+      auth: "a1",
+    });
+    expect(sub.id).toBeTruthy();
+    expect(sub.endpoint).toBe("https://push.example.com/a");
+    expect(sub.createdAt).toBeInstanceOf(Date);
+
+    const list = await repo.listPushSubscriptions();
+    expect(list).toHaveLength(1);
+    expect(list[0].endpoint).toBe("https://push.example.com/a");
+
+    await repo.deletePushSubscriptionByEndpoint("https://push.example.com/a");
+    expect(await repo.listPushSubscriptions()).toEqual([]);
+  });
+
+  it("upserts by endpoint, keeping a single row with refreshed keys", async () => {
+    await repo.addPushSubscription({
+      endpoint: "https://push.example.com/b",
+      p256dh: "p1",
+      auth: "a1",
+    });
+    const resub = await repo.addPushSubscription({
+      endpoint: "https://push.example.com/b",
+      p256dh: "p2",
+      auth: "a2",
+    });
+    const list = await repo.listPushSubscriptions();
+    expect(list).toHaveLength(1);
+    expect(list[0].p256dh).toBe("p2");
+    expect(list[0].auth).toBe("a2");
+    expect(resub.id).toBe(list[0].id);
+  });
+
+  it("returns an empty list when nothing is subscribed", async () => {
+    expect(await repo.listPushSubscriptions()).toEqual([]);
+  });
+});

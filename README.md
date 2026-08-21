@@ -57,6 +57,30 @@ npm run db:migrate    # apply pending migrations (requires DATABASE_URL)
 
 Migrations are committed so the Neon DB can be recreated from scratch.
 
+## Web Push notifications
+
+The app can send browser push notifications when tasks are created, statuses
+change, or comments are added. It uses the **VAPID** protocol with the
+`web-push` library.
+
+Generate a VAPID keypair once and store it:
+
+```bash
+npx web-push generate-vapid-keys
+```
+
+It prints a `publicKey` and `privateKey`. Set these environment variables:
+
+| Variable                   | Notes                                                            |
+| -------------------------- | ---------------------------------------------------------------- |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | VAPID public key. Safe to expose (it ships to the browser).  |
+| `VAPID_PRIVATE_KEY`        | VAPID private key. **Server-only — never commit or expose.**     |
+| `VAPID_SUBJECT`            | Contact for the push service, e.g. `mailto:you@example.com`.     |
+
+The subscribe button (bell icon, bottom-left) only appears when
+`NEXT_PUBLIC_VAPID_PUBLIC_KEY` is set. Notifications are stored per
+endpoint in the `push_subscriptions` table (upserted by endpoint).
+
 ## Deploying to Vercel
 
 1. Push the repo to GitHub and import it into Vercel (or `vercel deploy`).
@@ -73,6 +97,9 @@ Migrations are committed so the Neon DB can be recreated from scratch.
 | `R2_BUCKET`            | Yes      | R2 bucket name that stores attachments                         |
 | `R2_PUBLIC_BASE_URL`   | Optional | Public r2.dev URL (bucket → Settings → Public access)          |
 | `APP_URL`              | Optional | Public origin of the app                                       |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | No (opt-in) | VAPID public key to enable push notifications         |
+| `VAPID_PRIVATE_KEY`    | No (opt-in) | VAPID private key (server-only)                            |
+| `VAPID_SUBJECT`        | No (opt-in) | Push service contact (`mailto:...`)                       |
 
 4. Run `npm run db:migrate` against the fresh Neon DB before first use
    (e.g. via a one-off script/terminal, or on first deploy).

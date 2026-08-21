@@ -8,8 +8,10 @@ import { randomUUID } from "node:crypto";
 import type {
   Comment,
   NewComment,
+  NewPushSubscription,
   NewService,
   NewTask,
+  PushSubscription,
   Service,
   ServiceOption,
   ServiceUpdate,
@@ -26,6 +28,7 @@ export class MemoryRepository implements TaskRepository, ServiceRepository {
   private order = new Map<string, number>();
   private comments = new Map<string, { comment: Comment; seq: number }[]>();
   private commentSeq = 0;
+  private pushSubs = new Map<string, PushSubscription>();
 
   async listTasks(): Promise<Task[]> {
     return [...this.tasks.values()].sort((a, b) => {
@@ -187,5 +190,30 @@ export class MemoryRepository implements TaskRepository, ServiceRepository {
 
   async resolveServiceCost(id: string): Promise<number | null> {
     return this.services.get(id)?.defaultCostArs ?? null;
+  }
+
+  async listPushSubscriptions(): Promise<PushSubscription[]> {
+    return [...this.pushSubs.values()];
+  }
+
+  async addPushSubscription(
+    input: NewPushSubscription,
+  ): Promise<PushSubscription> {
+    // Upsert by endpoint so re-subscribing with the same push service never
+    // duplicates a row (the schema marks endpoint unique).
+    const existing = this.pushSubs.get(input.endpoint);
+    const sub: PushSubscription = {
+      id: existing?.id ?? randomUUID(),
+      endpoint: input.endpoint,
+      p256dh: input.p256dh,
+      auth: input.auth,
+      createdAt: existing?.createdAt ?? new Date(),
+    };
+    this.pushSubs.set(sub.endpoint, sub);
+    return { ...sub };
+  }
+
+  async deletePushSubscriptionByEndpoint(endpoint: string): Promise<void> {
+    this.pushSubs.delete(endpoint);
   }
 }

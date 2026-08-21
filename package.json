@@ -23,7 +23,8 @@
     "postgres": "^3.4.9",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "server-only": "^0.0.1"
+    "server-only": "^0.0.1",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
@@ -34,6 +35,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/web-push": "^3.6.4",
     "@vitejs/plugin-react": "^6.1.0",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",

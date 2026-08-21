@@ -183,6 +183,22 @@ export interface TaskUpdate {
 
 export type KanbanColumns = Record<TaskStatus, Task[]>;
 
+/** A browser's Web Push subscription (endpoint + encryption keys). */
+export interface PushSubscription {
+  id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  createdAt: Date;
+}
+
+/** Fields required to store a new push subscription. */
+export interface NewPushSubscription {
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+}
+
 /**
  * Groups a list of tasks into the three kanban columns.
  * Order is preserved within each column (caller should pass newest-first).

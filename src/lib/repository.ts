@@ -13,8 +13,10 @@
 import type {
   Comment,
   NewComment,
+  NewPushSubscription,
   NewService,
   NewTask,
+  PushSubscription,
   Service,
   ServiceOption,
   ServiceUpdate,
@@ -37,6 +39,12 @@ export interface TaskRepository {
   listCommentsByTask(taskId: string): Promise<Comment[]>;
   /** Adds a comment to a task. Returns null when the task doesn't exist. */
   addComment(input: NewComment): Promise<Comment | null>;
+  /** Lists all stored push subscriptions (one per device/browser). */
+  listPushSubscriptions(): Promise<PushSubscription[]>;
+  /** Stores a push subscription, upserting by endpoint. */
+  addPushSubscription(input: NewPushSubscription): Promise<PushSubscription>;
+  /** Removes a push subscription by its endpoint (e.g. a 404/410 from the push service). */
+  deletePushSubscriptionByEndpoint(endpoint: string): Promise<void>;
 }
 
 /** Service catalog data-access contract. */
