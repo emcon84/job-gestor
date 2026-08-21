@@ -43,6 +43,10 @@ export async function getUploadToken(): Promise<UploadToken> {
       pathname: "attachments/*",
       allowedContentTypes: [...ALLOWED_IMAGE_MIME],
       maximumSizeInBytes: MAX_ATTACHMENT_BYTES,
+      // The SDK default is 30 seconds and uses the serverless clock, which can
+      // be skewed — tokens were arriving already expired. Use an explicit 1h
+      // window (docs recommendation) so uploads never race the clock.
+      validUntil: Date.now() + 60 * 60 * 1000,
     });
     return {
       token,
