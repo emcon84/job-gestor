@@ -1,6 +1,22 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Montserrat } from "next/font/google";
+import ThemeToggle from "@/components/ThemeToggle";
 import "./globals.css";
+
+const themeInitScript = `
+  (function () {
+    try {
+      var stored = localStorage.getItem("theme");
+      var theme = stored === "light" || stored === "dark"
+        ? stored
+        : (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+      document.documentElement.setAttribute("data-theme", theme);
+    } catch (e) {
+      document.documentElement.setAttribute("data-theme", "dark");
+    }
+  })();
+`;
 
 const montserrat = Montserrat({
   variable: "--font-montserrat",
@@ -20,8 +36,16 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es">
+      <head>
+        <Script
+          id="theme-init"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: themeInitScript }}
+        />
+      </head>
       <body className={`${montserrat.variable} font-sans antialiased`}>
         {children}
+        <ThemeToggle />
       </body>
     </html>
   );

@@ -1,41 +1,81 @@
 @import "tailwindcss";
 
 /* ---------------------------------------------------------------------------
-   job-gestor dark theme (Tailwind v4 CSS-first)
-   Anchored on the dark navy observed at emilianticonti.com.
+   job-gestor theme system (Tailwind v4 CSS-first)
+   Two modes switch via the `data-theme` attribute on <html>:
+     - data-theme="dark"  (default) -> pure black base, no blue tint
+     - data-theme="light"           -> clean white / light gray
+   Tailwind color utilities (bg-surface, text-primary, border-card-border, ...)
+   resolve through --color-* tokens that map to mode variables below, so the
+   same classes work in both themes without changes.
 --------------------------------------------------------------------------- */
 
 @theme {
   /* Fonts */
   --font-sans: var(--font-montserrat), Arial, Helvetica, sans-serif;
 
-  /* Surfaces */
-  --color-background: #10162c; /* base navy */
-  --color-surface: #1a2240; /* elevated cards / inputs */
-  --color-card: #1a2240; /* task cards */
-  --color-card-border: #2b3554; /* subtle borders */
-
-  /* Text */
-  --color-primary: #f3f4f8; /* near-white */
-  --color-secondary: #a7aec6; /* body text */
-  --color-muted: #7c84a3; /* captions */
-
-  /* Accent */
-  --color-accent: #4f8cff; /* primary buttons / links */
+  /* Token names -> mode variables (defined per theme below) */
+  --color-background: var(--th-background);
+  --color-surface: var(--th-surface);
+  --color-card: var(--th-card);
+  --color-card-border: var(--th-card-border);
+  --color-primary: var(--th-primary);
+  --color-secondary: var(--th-secondary);
+  --color-muted: var(--th-muted);
+  --color-accent: var(--th-accent);
 
   /* Status */
-  --color-status-pending: #64748b;
-  --color-status-progress: #eab308;
-  --color-status-done: #22c55e;
-  --color-status-urgent: #ef4444;
+  --color-status-pending: var(--th-status-pending);
+  --color-status-progress: var(--th-status-progress);
+  --color-status-done: var(--th-status-done);
+  --color-status-urgent: var(--th-status-urgent);
 
   /* Feedback */
-  --color-error: #ef4444;
-  --color-success: #22c55e;
+  --color-error: var(--th-error);
+  --color-success: var(--th-success);
 }
 
-:root {
+/* ---------------------------------------------------------------------------
+   DARK (default): pure black base, very dark elevated surfaces, no blue tint.
+--------------------------------------------------------------------------- */
+:root,
+:root[data-theme="dark"] {
+  --th-background: #000000; /* pure black base */
+  --th-surface: #0d0d0d; /* elevated cards / inputs */
+  --th-card: #171717; /* task cards */
+  --th-card-border: #262626; /* subtle borders */
+  --th-primary: #fafafa; /* near-white text */
+  --th-secondary: #a3a3a3; /* body text */
+  --th-muted: #737373; /* captions */
+  --th-accent: #4f8cff; /* primary buttons / links (vivid on black) */
+  --th-status-pending: #94a3b8;
+  --th-status-progress: #eab308;
+  --th-status-done: #22c55e;
+  --th-status-urgent: #ef4444;
+  --th-error: #ef4444;
+  --th-success: #22c55e;
   color-scheme: dark;
+}
+
+/* ---------------------------------------------------------------------------
+   LIGHT: white / very light gray, near-black text, accessible accent.
+--------------------------------------------------------------------------- */
+:root[data-theme="light"] {
+  --th-background: #ffffff;
+  --th-surface: #f5f5f5; /* elevated cards / inputs */
+  --th-card: #ffffff; /* task cards */
+  --th-card-border: #e5e5e5; /* subtle borders */
+  --th-primary: #0a0a0a; /* near-black text */
+  --th-secondary: #3f3f3f; /* body text */
+  --th-muted: #6b6b6b; /* captions */
+  --th-accent: #2563eb; /* darker blue so white text keeps AA contrast */
+  --th-status-pending: #475569;
+  --th-status-progress: #a16207;
+  --th-status-done: #15803d;
+  --th-status-urgent: #b91c1c;
+  --th-error: #b91c1c;
+  --th-success: #15803d;
+  color-scheme: light;
 }
 
 html {
@@ -68,4 +108,10 @@ input,
 select,
 textarea {
   font-size: 16px;
+}
+
+/* Themed form controls (select dropdowns / file inputs) follow color-scheme */
+select,
+input[type="file"]::file-selector-button {
+  color: var(--color-primary);
 }
