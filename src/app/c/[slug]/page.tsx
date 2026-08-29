@@ -62,18 +62,24 @@ export default async function ClientPortalPage({
           className="mb-3 flex items-start gap-3 rounded-2xl border border-accent/40 bg-accent/10 p-4"
         >
           <Info className="mt-0.5 h-5 w-5 shrink-0 text-accent" aria-hidden />
-          <div className="space-y-1 text-sm text-secondary">
-            <p>
-              El abono es el acuerdo de costo mensual por mantenimiento. No es
-              estricto: puede sobrepasarse si es necesario.
+          {client.portalMessage ? (
+            <p className="whitespace-pre-line text-sm text-secondary">
+              {client.portalMessage}
             </p>
-            <p>
-              En los meses donde no se realizan tareas no se cobra — solo se
-              cobra lo que se ve en este listado.
-            </p>
-          </div>
+          ) : (
+            <div className="space-y-1 text-sm text-secondary">
+              <p>
+                El abono es el acuerdo de costo mensual por mantenimiento. No es
+                estricto: puede sobrepasarse si es necesario.
+              </p>
+              <p>
+                En los meses donde no se realizan tareas no se cobra — solo se
+                cobra lo que se ve en este listado.
+              </p>
+            </div>
+          )}
         </div>
-        {tasks.length > 0 && (
+        {client.showPackProgress && tasks.length > 0 && (
           <ProgressBar
             summary={packSummary}
             threshold={client.packThresholdCents}

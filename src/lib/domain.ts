@@ -42,6 +42,10 @@ export interface Client {
   packThresholdCents: number;
   /** Optional login username. Nullable (null = no credentials, shared link). */
   username: string | null;
+  /** Custom note shown on the portal "Tu abono" section. Null = default note. */
+  portalMessage: string | null;
+  /** Whether to show the pack spending bar. false = hide it (e.g. prepaid client). */
+  showPackProgress: boolean;
   createdAt: Date;
 }
 
@@ -54,6 +58,10 @@ export interface NewClient {
   username?: string | null;
   /** Optional scrypt hash of the login password. Never returned to the UI. */
   passwordHash?: string | null;
+  /** Optional custom note for the portal "Tu abono" section. Omit/null = default note. */
+  portalMessage?: string | null;
+  /** Whether to show the pack spending bar. Defaults to true (visible). */
+  showPackProgress?: boolean;
 }
 
 /** Fields the owner may edit on an existing client. */
@@ -65,6 +73,10 @@ export interface ClientUpdate {
   username?: string | null;
   /** Optional scrypt hash. `undefined` keeps the current value. */
   passwordHash?: string | null;
+  /** Optional custom portal note. `undefined` keeps it, `null` clears to default. */
+  portalMessage?: string | null;
+  /** Whether to show the pack spending bar. `undefined` keeps the current value. */
+  showPackProgress?: boolean;
 }
 
 /** Validates a client login username (lowercase letters/digits/_- , 3-32). */

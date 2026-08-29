@@ -113,6 +113,8 @@ function mapClient(row: ClientRow): Client {
     slug: row.slug,
     packThresholdCents: row.packThresholdCents,
     username: row.username,
+    portalMessage: row.portalMessage,
+    showPackProgress: row.showPackProgress,
     createdAt: row.createdAt,
   };
 }
@@ -177,6 +179,8 @@ export class PostgresRepository
         packThresholdCents: input.packThresholdCents,
         username: input.username ?? null,
         passwordHash: input.passwordHash ?? null,
+        portalMessage: input.portalMessage ?? null,
+        showPackProgress: input.showPackProgress ?? true,
       })
       .returning();
     return mapClient(row);
@@ -196,6 +200,14 @@ export class PostgresRepository
           update.packThresholdCents ?? existing.packThresholdCents,
         username: update.username ?? existing.username,
         passwordHash: update.passwordHash ?? existing.passwordHash,
+        portalMessage:
+          update.portalMessage !== undefined
+            ? update.portalMessage
+            : existing.portalMessage,
+        showPackProgress:
+          update.showPackProgress !== undefined
+            ? update.showPackProgress
+            : existing.showPackProgress,
       })
       .where(eq(clients.id, id))
       .returning();

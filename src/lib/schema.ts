@@ -11,6 +11,7 @@ import {
   integer,
   timestamp,
   uuid,
+  boolean,
 } from "drizzle-orm/pg-core";
 
 export const clients = pgTable("clients", {
@@ -25,6 +26,10 @@ export const clients = pgTable("clients", {
   // Multiple NULLs are allowed on a unique column in Postgres.
   username: text("username").unique(),
   passwordHash: text("password_hash"),
+  // Custom note for the portal "Tu abono" section. Null = use the default note.
+  portalMessage: text("portal_message"),
+  // Whether to show the pack spending bar. false = hide it (e.g. prepaid client).
+  showPackProgress: boolean("show_pack_progress").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

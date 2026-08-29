@@ -21,6 +21,8 @@ export default function ClientEdit({ client }: { client: Client }) {
   );
   const [username, setUsername] = useState(client.username ?? "");
   const [password, setPassword] = useState("");
+  const [note, setNote] = useState(client.portalMessage ?? "");
+  const [showBar, setShowBar] = useState(client.showPackProgress);
   const [msg, setMsg] = useState<{ kind: "error" | "success"; text: string } | null>(
     null,
   );
@@ -33,6 +35,8 @@ export default function ClientEdit({ client }: { client: Client }) {
     fd.set("packThresholdArs", threshold);
     fd.set("username", username);
     fd.set("password", password);
+    fd.set("portalMessage", note);
+    fd.set("showPackProgress", showBar ? "on" : "");
     const r: ActionResult = await updateClient(fd);
     setMsg(
       r.ok
@@ -93,6 +97,31 @@ export default function ClientEdit({ client }: { client: Client }) {
           ? "El cliente ingresa con usuario"
           : "Sin acceso por usuario configurado (usa el enlace directo)"}
       </p>
+      <div className="mt-4 space-y-2">
+        <p className="text-xs font-medium text-secondary">
+          Sección {"Tu abono"} del portal
+        </p>
+        <textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="Mensaje del abono (opcional). Si lo dejás vacío, se usa el texto por defecto."
+          rows={3}
+          className="w-full rounded-lg border border-card-border bg-surface px-3 py-2 text-sm text-primary"
+        />
+        <label className="flex items-center gap-2 text-sm text-secondary">
+          <input
+            type="checkbox"
+            checked={showBar}
+            onChange={(e) => setShowBar(e.target.checked)}
+            className="h-4 w-4"
+          />
+          Mostrar la barra de gasto del abono
+        </label>
+        <p className="text-xs text-muted">
+          Estos controles personalizan la sección {"Tu abono"} en el portal del
+          cliente.
+        </p>
+      </div>
       <button
         type="button"
         onClick={onSave}

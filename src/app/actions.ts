@@ -588,6 +588,10 @@ export async function createClient(formData: FormData): Promise<ActionResult> {
   const usernameRaw = (formData.get("username") as string | null) ?? "";
   const passwordRaw = (formData.get("password") as string | null) ?? "";
   const username = usernameRaw.trim().toLowerCase();
+  const portalMessageRaw = (formData.get("portalMessage") as string | null)?.trim() ?? "";
+  const showPackProgressRaw = formData.get("showPackProgress") ?? "";
+  const portalMessage = portalMessageRaw || null;
+  const showPackProgress = showPackProgressRaw === "on";
 
   if (!name) {
     return { ok: false, error: "El nombre del cliente es obligatorio." };
@@ -642,6 +646,8 @@ export async function createClient(formData: FormData): Promise<ActionResult> {
     packThresholdCents: cents,
     username: newUsername,
     passwordHash,
+    portalMessage,
+    showPackProgress,
   });
   revalidatePath("/");
   revalidatePath("/owner");
@@ -665,6 +671,10 @@ export async function updateClient(formData: FormData): Promise<ActionResult> {
   const usernameRaw = (formData.get("username") as string | null) ?? "";
   const passwordRaw = (formData.get("password") as string | null) ?? "";
   const usernameInput = usernameRaw.trim().toLowerCase();
+  const portalMessageRaw = (formData.get("portalMessage") as string | null)?.trim() ?? "";
+  const showPackProgressRaw = formData.get("showPackProgress") ?? "";
+  const portalMessage = portalMessageRaw || null;
+  const showPackProgress = showPackProgressRaw === "on";
 
   if (!id) {
     return { ok: false, error: "Falta el id del cliente." };
@@ -736,6 +746,8 @@ export async function updateClient(formData: FormData): Promise<ActionResult> {
     packThresholdCents: cents,
     ...(newUsername !== undefined ? { username: newUsername } : {}),
     ...(newPasswordHash !== undefined ? { passwordHash: newPasswordHash } : {}),
+    portalMessage,
+    showPackProgress,
   });
   if (!updated) {
     return { ok: false, error: "No se encontró el cliente." };

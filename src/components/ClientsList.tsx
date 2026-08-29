@@ -29,6 +29,8 @@ export default function ClientsList({
   const [threshold, setThreshold] = useState("150000");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [note, setNote] = useState("");
+  const [showBar, setShowBar] = useState(true);
   const [msg, setMsg] = useState<{ kind: "error" | "success"; text: string } | null>(
     null,
   );
@@ -40,6 +42,8 @@ export default function ClientsList({
     fd.set("packThresholdArs", threshold);
     fd.set("username", username);
     fd.set("password", password);
+    fd.set("portalMessage", note);
+    fd.set("showPackProgress", showBar ? "on" : "");
     const r: ActionResult = await createClient(fd);
     setMsg(
       r.ok
@@ -51,6 +55,8 @@ export default function ClientsList({
       setSlug("");
       setUsername("");
       setPassword("");
+      setNote("");
+      setShowBar(true);
       router.refresh();
     }
   }
@@ -113,6 +119,31 @@ export default function ClientsList({
           Usuario y contraseña son opcionales. Si los dejás vacíos, el cliente
           usa su enlace directo sin iniciar sesión.
         </p>
+        <div className="mt-4 space-y-2">
+          <p className="text-xs font-medium text-secondary">
+            Sección {"Tu abono"} del portal
+          </p>
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Mensaje del abono (opcional). Si lo dejás vacío, se usa el texto por defecto."
+            rows={3}
+            className="w-full rounded-lg border border-card-border bg-surface px-3 py-2 text-sm text-primary"
+          />
+          <label className="flex items-center gap-2 text-sm text-secondary">
+            <input
+              type="checkbox"
+              checked={showBar}
+              onChange={(e) => setShowBar(e.target.checked)}
+              className="h-4 w-4"
+            />
+            Mostrar la barra de gasto del abono
+          </label>
+          <p className="text-xs text-muted">
+            Los personaliza al cliente: si no ponés mensaje, se usa el texto por
+            defecto del abono.
+          </p>
+        </div>
         {msg && (
           <p
             role={msg.kind === "error" ? "alert" : "status"}

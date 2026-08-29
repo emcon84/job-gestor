@@ -86,6 +86,8 @@ export class MemoryRepository
       slug: input.slug,
       packThresholdCents: input.packThresholdCents,
       username: input.username ?? null,
+      portalMessage: input.portalMessage ?? null,
+      showPackProgress: input.showPackProgress ?? true,
       createdAt: new Date(),
     };
     this.clients.set(client.id, client);
@@ -107,6 +109,14 @@ export class MemoryRepository
       packThresholdCents:
         update.packThresholdCents ?? existing.packThresholdCents,
       username: update.username ?? existing.username,
+      portalMessage:
+        update.portalMessage !== undefined
+          ? update.portalMessage
+          : existing.portalMessage,
+      showPackProgress:
+        update.showPackProgress !== undefined
+          ? update.showPackProgress
+          : existing.showPackProgress,
     };
     this.clients.set(id, updated);
     if (update.passwordHash !== undefined && update.passwordHash !== null) {
