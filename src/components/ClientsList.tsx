@@ -27,6 +27,8 @@ export default function ClientsList({
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [threshold, setThreshold] = useState("150000");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [msg, setMsg] = useState<{ kind: "error" | "success"; text: string } | null>(
     null,
   );
@@ -36,6 +38,8 @@ export default function ClientsList({
     fd.set("name", name);
     fd.set("slug", slug);
     fd.set("packThresholdArs", threshold);
+    fd.set("username", username);
+    fd.set("password", password);
     const r: ActionResult = await createClient(fd);
     setMsg(
       r.ok
@@ -45,6 +49,8 @@ export default function ClientsList({
     if (r.ok) {
       setName("");
       setSlug("");
+      setUsername("");
+      setPassword("");
       router.refresh();
     }
   }
@@ -87,6 +93,26 @@ export default function ClientsList({
             Crear cliente
           </button>
         </div>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          <input
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="Usuario (opcional)"
+            className="rounded-lg border border-card-border bg-surface px-3 py-2 text-sm text-primary"
+          />
+          <input
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            type="password"
+            autoComplete="new-password"
+            placeholder="Contraseña (opcional)"
+            className="rounded-lg border border-card-border bg-surface px-3 py-2 text-sm text-primary"
+          />
+        </div>
+        <p className="mt-1 text-xs text-muted">
+          Usuario y contraseña son opcionales. Si los dejás vacíos, el cliente
+          usa su enlace directo sin iniciar sesión.
+        </p>
         {msg && (
           <p
             role={msg.kind === "error" ? "alert" : "status"}

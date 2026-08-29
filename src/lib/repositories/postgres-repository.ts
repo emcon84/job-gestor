@@ -27,6 +27,7 @@ import type {
 import { resolveCompletedAt } from "../domain";
 import type {
   ClientRepository,
+  ClientCredentials,
   ServiceRepository,
   TaskRepository,
 } from "../repository";
@@ -111,6 +112,7 @@ function mapClient(row: ClientRow): Client {
     name: row.name,
     slug: row.slug,
     packThresholdCents: row.packThresholdCents,
+    username: row.username,
     createdAt: row.createdAt,
   };
 }
@@ -151,6 +153,21 @@ export class PostgresRepository
     return row ? mapClient(row) : null;
   }
 
+  async getClientByUsername(username: string): Promise<ClientCredentials | null> {
+    const [row] = await db
+      .select()
+      .from(clients)
+      .where(eq(clients.username, username))
+      .limit(1);
+    if (!row || !row.passwordHash) return null;
+    return {
+      clientId: row.id,
+      slug: row.slug,
+      username: row.username!,
+      passwordHash: row.passwordHash,
+    };
+  }
+
   async createClient(input: NewClient): Promise<Client> {
     const [row] = await db
       .insert(clients)
@@ -158,6 +175,8 @@ export class PostgresRepository
         name: input.name,
         slug: input.slug,
         packThresholdCents: input.packThresholdCents,
+        username: input.username ?? null,
+        passwordHash: input.passwordHash ?? null,
       })
       .returning();
     return mapClient(row);
@@ -175,6 +194,8 @@ export class PostgresRepository
         slug: update.slug ?? existing.slug,
         packThresholdCents:
           update.packThresholdCents ?? existing.packThresholdCents,
+        username: update.username ?? existing.username,
+        passwordHash: update.passwordHash ?? existing.passwordHash,
       })
       .where(eq(clients.id, id))
       .returning();

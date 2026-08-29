@@ -21,3 +21,8 @@ export interface UploadUrlResult extends ActionResult {
 export interface UnlockState {
   error?: string;
 }
+
+/** State shape used by React `useActionState` for the client login form. */
+export interface ClientLoginState {
+  error?: string;
+}

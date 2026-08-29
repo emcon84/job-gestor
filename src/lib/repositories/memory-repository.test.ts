@@ -118,6 +118,35 @@ describe("MemoryRepository clients", () => {
     });
     expect(await repo.deleteClient(client.id)).toBe(false);
   });
+
+  it("returns credentials for a client with a username, and null otherwise", async () => {
+    const withCreds = await repo.createClient({
+      name: "Cliente 1",
+      slug: "cliente-1",
+      packThresholdCents: 150_000_00,
+      username: "cliente1",
+      passwordHash: "salt:hash",
+    });
+    const creds = await repo.getClientByUsername("cliente1");
+    expect(creds).not.toBeNull();
+    expect(creds?.clientId).toBe(withCreds.id);
+    expect(creds?.slug).toBe("cliente-1");
+    expect(creds?.username).toBe("cliente1");
+    expect(creds?.passwordHash).toBe("salt:hash");
+
+    await expect(repo.getClientByUsername("no-existe")).resolves.toBeNull();
+
+    // A client without credentials must not be returned.
+    await repo.createClient({
+      name: "Sin Usuario",
+      slug: "sin-usuario",
+      packThresholdCents: 150_000_00,
+    });
+    await expect(repo.getClientByUsername("cliente1")).resolves.toMatchObject({
+      username: "cliente1",
+    });
+    await expect(repo.getClientByUsername("sin-usuario")).resolves.toBeNull();
+  });
 });
 
 describe("MemoryRepository", () => {

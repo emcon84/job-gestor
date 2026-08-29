@@ -24,6 +24,7 @@ import type {
 import { resolveCompletedAt } from "../domain";
 import type {
   ClientRepository,
+  ClientCredentials,
   ServiceRepository,
   TaskRepository,
 } from "../repository";
@@ -32,6 +33,7 @@ export class MemoryRepository
   implements ClientRepository, TaskRepository, ServiceRepository
 {
   private clients = new Map<string, Client>();
+  private clientPasswordHashes = new Map<string, string>();
   private tasks = new Map<string, Task>();
   private services = new Map<string, Service>();
   private seq = 0;
@@ -59,15 +61,37 @@ export class MemoryRepository
     return null;
   }
 
+  async getClientByUsername(username: string): Promise<ClientCredentials | null> {
+    for (const c of this.clients.values()) {
+      if (c.username !== null && c.username === username) {
+        const passwordHash = this.clientPasswordHashes.get(c.id);
+        if (!passwordHash) {
+          return null;
+        }
+        return {
+          clientId: c.id,
+          slug: c.slug,
+          username: c.username,
+          passwordHash,
+        };
+      }
+    }
+    return null;
+  }
+
   async createClient(input: NewClient): Promise<Client> {
     const client: Client = {
       id: randomUUID(),
       name: input.name,
       slug: input.slug,
       packThresholdCents: input.packThresholdCents,
+      username: input.username ?? null,
       createdAt: new Date(),
     };
     this.clients.set(client.id, client);
+    if (input.passwordHash) {
+      this.clientPasswordHashes.set(client.id, input.passwordHash);
+    }
     return { ...client };
   }
 
@@ -82,8 +106,12 @@ export class MemoryRepository
       slug: update.slug ?? existing.slug,
       packThresholdCents:
         update.packThresholdCents ?? existing.packThresholdCents,
+      username: update.username ?? existing.username,
     };
     this.clients.set(id, updated);
+    if (update.passwordHash !== undefined && update.passwordHash !== null) {
+      this.clientPasswordHashes.set(id, update.passwordHash);
+    }
     return { ...updated };
   }
 

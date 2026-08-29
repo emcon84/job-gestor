@@ -1,12 +1,14 @@
 import Link from "next/link";
 import RefreshOnMount from "@/components/RefreshOnMount";
+import ClientLoginForm from "@/components/ClientLoginForm";
 
 export const dynamic = "force-dynamic";
 
 /**
  * Public landing. Deliberately shows NO client data: each client uses their
  * own private portal link (/c/[slug]). The client index lives behind the
- * passphrase-protected /owner.
+ * passphrase-protected /owner. Clients with credentials sign in here; clients
+ * without credentials keep using their shared portal link directly.
  */
 export default async function HomePage() {
   return (
@@ -21,11 +23,14 @@ export default async function HomePage() {
         </p>
       </header>
 
-      <div className="rounded-2xl border border-card-border bg-card p-6 text-center space-y-3">
-        <p className="text-sm text-secondary">
-          Si sos cliente, ingresá con el enlace personalizado que te brindó tu
-          proveedor de mantenimiento.
-        </p>
+      <div className="rounded-2xl border border-card-border bg-card p-6 space-y-4">
+        <div className="text-center">
+          <h2 className="text-lg font-semibold text-primary">Ingresar</h2>
+          <p className="text-sm text-secondary">
+            Accedé con tu usuario y contraseña para ver el estado de tus tareas.
+          </p>
+        </div>
+        <ClientLoginForm />
       </div>
 
       <footer className="mt-10 border-t border-card-border pt-4 text-center">

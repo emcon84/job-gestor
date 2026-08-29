@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { safeEqual, verifyPassphrase } from "./auth";
+import {
+  hashPassword,
+  safeEqual,
+  verifyPassphrase,
+  verifyPassword,
+} from "./auth";
 
 describe("safeEqual", () => {
   it("returns true for identical strings", () => {
@@ -62,5 +67,26 @@ describe("verifyPassphrase", () => {
     expect(verifyPassphrase("correct-horse", "correct-horse", key)).toEqual({
       ok: true,
     });
+  });
+});
+
+describe("hashPassword / verifyPassword", () => {
+  it("round-trips a correct password", async () => {
+    const hash = await hashPassword("s3cr3t-password");
+    expect(hash).toBeTruthy();
+    expect(hash.includes(":")).toBe(true);
+    await expect(verifyPassword("s3cr3t-password", hash)).resolves.toBe(true);
+  });
+
+  it("returns false for a wrong password", async () => {
+    const hash = await hashPassword("s3cr3t-password");
+    await expect(verifyPassword("wrong", hash)).resolves.toBe(false);
+  });
+
+  it("returns false for a malformed stored value", async () => {
+    await expect(verifyPassword("anything", "not-a-hash")).resolves.toBe(false);
+    await expect(verifyPassword("anything", "")).resolves.toBe(false);
+    await expect(verifyPassword("anything", "salt:")).resolves.toBe(false);
+    await expect(verifyPassword("anything", ":hash")).resolves.toBe(false);
   });
 });

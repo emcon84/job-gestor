@@ -20,6 +20,11 @@ export const clients = pgTable("clients", {
   packThresholdCents: integer("pack_threshold_cents")
     .notNull()
     .default(150_000_00), // $150.000 ARS in cents
+  // Optional per-client login credentials. Nullable so clients without a
+  // username keep working via the shared portal link (no login required).
+  // Multiple NULLs are allowed on a unique column in Postgres.
+  username: text("username").unique(),
+  passwordHash: text("password_hash"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

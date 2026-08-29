@@ -9,6 +9,7 @@ function makeClient(overrides: Partial<Client> = {}): Client {
     name: "Acme SA",
     slug: "acme-sa",
     packThresholdCents: 150_000_00,
+    username: null,
     createdAt: new Date("2026-01-01T00:00:00Z"),
     ...overrides,
   };

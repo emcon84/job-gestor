@@ -19,6 +19,8 @@ export default function ClientEdit({ client }: { client: Client }) {
   const [threshold, setThreshold] = useState(
     centsToPesosInput(client.packThresholdCents),
   );
+  const [username, setUsername] = useState(client.username ?? "");
+  const [password, setPassword] = useState("");
   const [msg, setMsg] = useState<{ kind: "error" | "success"; text: string } | null>(
     null,
   );
@@ -29,6 +31,8 @@ export default function ClientEdit({ client }: { client: Client }) {
     fd.set("name", name);
     fd.set("slug", slug);
     fd.set("packThresholdArs", threshold);
+    fd.set("username", username);
+    fd.set("password", password);
     const r: ActionResult = await updateClient(fd);
     setMsg(
       r.ok
@@ -67,6 +71,28 @@ export default function ClientEdit({ client }: { client: Client }) {
           className="rounded-lg border border-card-border bg-surface px-3 py-2 text-sm text-primary"
         />
       </div>
+      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+        <input
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          placeholder="Usuario"
+          autoComplete="off"
+          className="rounded-lg border border-card-border bg-surface px-3 py-2 text-sm text-primary"
+        />
+        <input
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          type="password"
+          autoComplete="new-password"
+          placeholder="Dejá vacío para no cambiarla"
+          className="rounded-lg border border-card-border bg-surface px-3 py-2 text-sm text-primary"
+        />
+      </div>
+      <p className="mt-2 text-xs text-muted">
+        {client.username
+          ? "El cliente ingresa con usuario"
+          : "Sin acceso por usuario configurado (usa el enlace directo)"}
+      </p>
       <button
         type="button"
         onClick={onSave}

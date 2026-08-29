@@ -3,7 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { COOKIE_NAME, COOKIE_VALUE, verifyPassphrase } from "@/lib/auth";
+import {
+  COOKIE_NAME,
+  COOKIE_VALUE,
+  verifyPassphrase,
+  hashPassword,
+  verifyPassword,
+  clientLoginRateLimiter,
+} from "@/lib/auth";
 import { getUploadUrl, MAX_ATTACHMENT_BYTES, resolveImageType } from "@/lib/r2";
 import type {
   Attachment,
@@ -18,6 +25,7 @@ import {
   STATUS_LABELS,
   canClientMove,
   isValidSlug,
+  isValidUsername,
   parseDueDate,
   slugify,
   validateCommentAuthorName,
@@ -26,7 +34,12 @@ import {
 import { parsePesosToCents } from "@/lib/format";
 import { getRepository } from "@/lib/store";
 import { sendPushNotifications } from "@/lib/push";
-import type { ActionResult, UnlockState, UploadUrlResult } from "@/lib/action-types";
+import type {
+  ActionResult,
+  ClientLoginState,
+  UnlockState,
+  UploadUrlResult,
+} from "@/lib/action-types";
 
 /** Reads whether the current request carries a valid owner cookie. */
 export async function isOwner(): Promise<boolean> {
@@ -561,6 +574,9 @@ export async function deleteService(formData: FormData): Promise<ActionResult> {
 /**
  * Owner-only: creates a client. The slug defaults from the name via `slugify`
  * but can be overridden by the owner. The pack threshold is parsed from pesos.
+ * Credentials (username + password) are OPTIONAL: when a username is provided a
+ * password is required (hashed with scrypt); otherwise the client keeps using
+ * the shared portal link with no login.
  */
 export async function createClient(formData: FormData): Promise<ActionResult> {
   if (!(await isOwner())) {
@@ -569,6 +585,9 @@ export async function createClient(formData: FormData): Promise<ActionResult> {
   const name = (formData.get("name") as string | null)?.trim() ?? "";
   const slugRaw = (formData.get("slug") as string | null)?.trim() ?? "";
   const thresholdRaw = (formData.get("packThresholdArs") as string | null) ?? "";
+  const usernameRaw = (formData.get("username") as string | null) ?? "";
+  const passwordRaw = (formData.get("password") as string | null) ?? "";
+  const username = usernameRaw.trim().toLowerCase();
 
   if (!name) {
     return { ok: false, error: "El nombre del cliente es obligatorio." };
@@ -589,18 +608,52 @@ export async function createClient(formData: FormData): Promise<ActionResult> {
     return { ok: false, error: "Monto de abono inválido." };
   }
 
+  let newUsername: string | null = null;
+  let passwordHash: string | null = null;
+  if (username) {
+    if (!isValidUsername(username)) {
+      return {
+        ok: false,
+        error:
+          "El usuario debe tener entre 3 y 32 caracteres y solo minúsculas, números, guiones o guiones bajos.",
+      };
+    }
+    if (!passwordRaw) {
+      return { ok: false, error: "Falta la contraseña del cliente." };
+    }
+    passwordHash = await hashPassword(passwordRaw);
+    newUsername = username;
+  }
+
   const repo = await getRepository();
   const existing = await repo.getClientBySlug(slug);
   if (existing) {
     return { ok: false, error: "Ya existe un cliente con ese slug." };
   }
-  await repo.createClient({ name, slug, packThresholdCents: cents });
+  if (newUsername) {
+    const creds = await repo.getClientByUsername(newUsername);
+    if (creds) {
+      return { ok: false, error: "Ya existe un cliente con ese usuario." };
+    }
+  }
+  await repo.createClient({
+    name,
+    slug,
+    packThresholdCents: cents,
+    username: newUsername,
+    passwordHash,
+  });
   revalidatePath("/");
   revalidatePath("/owner");
   return { ok: true, message: "Cliente creado." };
 }
 
-/** Owner-only: updates a client's name / slug / pack threshold. */
+/**
+ * Owner-only: updates a client's name / slug / pack threshold, and optionally
+ * its login credentials. A blank username input keeps the current username (or
+ * keeps it unset); a non-empty password re-hashes it (scrypt). Credentials that
+ * don't yet exist cannot be awarded a username without a password.
+ */
 export async function updateClient(formData: FormData): Promise<ActionResult> {
   if (!(await isOwner())) {
     return { ok: false, error: "No autorizado." };
@@ -609,6 +662,9 @@ export async function updateClient(formData: FormData): Promise<ActionResult> {
   const name = (formData.get("name") as string | null)?.trim() ?? "";
   const slugRaw = (formData.get("slug") as string | null)?.trim() ?? "";
   const thresholdRaw = (formData.get("packThresholdArs") as string | null) ?? "";
+  const usernameRaw = (formData.get("username") as string | null) ?? "";
+  const passwordRaw = (formData.get("password") as string | null) ?? "";
+  const usernameInput = usernameRaw.trim().toLowerCase();
 
   if (!id) {
     return { ok: false, error: "Falta el id del cliente." };
@@ -632,6 +688,23 @@ export async function updateClient(formData: FormData): Promise<ActionResult> {
     return { ok: false, error: "Monto de abono inválido." };
   }
 
+  let newUsername: string | undefined;
+  if (usernameInput) {
+    if (!isValidUsername(usernameInput)) {
+      return {
+        ok: false,
+        error:
+          "El usuario debe tener entre 3 y 32 caracteres y solo minúsculas, números, guiones o guiones bajos.",
+      };
+    }
+    newUsername = usernameInput;
+  }
+
+  let newPasswordHash: string | undefined;
+  if (passwordRaw) {
+    newPasswordHash = await hashPassword(passwordRaw);
+  }
+
   const repo = await getRepository();
   const current = await repo.getClient(id);
   if (!current) {
@@ -643,16 +716,71 @@ export async function updateClient(formData: FormData): Promise<ActionResult> {
       return { ok: false, error: "Ya existe un cliente con ese slug." };
     }
   }
+
+  const hasCurrentUsername = current.username !== null;
+  const finalHasUsername = newUsername !== undefined || hasCurrentUsername;
+  if (finalHasUsername && !hasCurrentUsername && newPasswordHash === undefined) {
+    return { ok: false, error: "Falta la contraseña del cliente." };
+  }
+
+  if (newUsername !== undefined && newUsername !== current.username) {
+    const creds = await repo.getClientByUsername(newUsername);
+    if (creds && creds.clientId !== id) {
+      return { ok: false, error: "Ya existe un cliente con ese usuario." };
+    }
+  }
+
   const updated = await repo.updateClient(id, {
     name,
     slug,
     packThresholdCents: cents,
+    ...(newUsername !== undefined ? { username: newUsername } : {}),
+    ...(newPasswordHash !== undefined ? { passwordHash: newPasswordHash } : {}),
   });
   if (!updated) {
     return { ok: false, error: "No se encontró el cliente." };
   }
   revalidateClient(updated.slug);
   return { ok: true, message: "Cliente actualizado." };
+}
+
+/**
+ * Client login. Verifies username + password (scrypt) and redirects to the
+ * client's portal on success. Used as the `useActionState<ClientLoginState,
+ * FormData>` action for the home-page login form. Failed attempts are
+ * rate-limited per IP. Notice the `redirect()` is intentional — Next.js throws
+ * a NEXT_REDIRECT here rather than returning; it must NOT be wrapped in
+ * try/catch.
+ */
+export async function loginClient(
+  _prev: ClientLoginState,
+  formData: FormData,
+): Promise<ClientLoginState> {
+  const username = (formData.get("username") as string | null)?.trim().toLowerCase() ?? "";
+  const password = (formData.get("password") as string | null) ?? "";
+  const h = await headers();
+  const xff = h.get("x-forwarded-for");
+  const ip = xff ? xff.split(",")[0].trim() : "local";
+  const key = `login:${ip}`;
+  if (clientLoginRateLimiter.isLocked(key)) {
+    return { error: "Demasiados intentos. Volvé a intentar en unos minutos." };
+  }
+  if (!username || !password) {
+    return { error: "Ingresá tu usuario y contraseña." };
+  }
+  const repo = await getRepository();
+  const creds = await repo.getClientByUsername(username);
+  if (!creds) {
+    clientLoginRateLimiter.recordFailure(key);
+    return { error: "Usuario o contraseña incorrectos." };
+  }
+  const ok = await verifyPassword(password, creds.passwordHash);
+  if (!ok) {
+    clientLoginRateLimiter.recordFailure(key);
+    return { error: "Usuario o contraseña incorrectos." };
+  }
+  clientLoginRateLimiter.reset(key);
+  redirect(`/c/${creds.slug}`);
 }
 
 /** Owner-only: deletes a client. Refused while it still has tasks or services. */

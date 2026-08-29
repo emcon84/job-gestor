@@ -9,6 +9,9 @@
  * so it can be unit-tested; the cookie plumbing uses Next.js `cookies()`.
  */
 
+import { randomBytes, scrypt as _scrypt, timingSafeEqual } from "node:crypto";
+import { promisify } from "node:util";
+
 const COOKIE_NAME = "owner";
 
 /** Value stored in the owner session cookie when unlocked. */
@@ -82,6 +85,60 @@ class RateLimiter {
 
 /** Singleton rate limiter shared across requests for this serverless instance. */
 export const unlockRateLimiter = new RateLimiter(5, 10 * 60 * 1000);
+
+const scrypt = promisify(_scrypt);
+const SCRYPT_KEYLEN = 64;
+
+/**
+ * Hashes a password with scrypt and a random 16-byte salt.
+ * Returns `"<saltHex>:<derivedHex>"` (64-byte derived key, hex-encoded).
+ */
+export async function hashPassword(password: string): Promise<string> {
+  const salt = randomBytes(16);
+  const derived = (await scrypt(password, salt, SCRYPT_KEYLEN)) as Buffer;
+  return `${salt.toString("hex")}:${derived.toString("hex")}`;
+}
+
+/**
+ * Verifies a password against a stored `"<saltHex>:<derivedHex>"` hash.
+ * Uses a constant-time comparison; returns false on any malformed input.
+ */
+export async function verifyPassword(
+  password: string,
+  stored: string,
+): Promise<boolean> {
+  const sep = stored.indexOf(":");
+  if (sep < 0) {
+    return false;
+  }
+  const saltHex = stored.slice(0, sep);
+  const storedHex = stored.slice(sep + 1);
+  if (!saltHex || !storedHex) {
+    return false;
+  }
+  let salt: Buffer;
+  let expected: Buffer;
+  try {
+    salt = Buffer.from(saltHex, "hex");
+    expected = Buffer.from(storedHex, "hex");
+  } catch {
+    return false;
+  }
+  if (salt.length === 0 || expected.length === 0) {
+    return false;
+  }
+  const derived = (await scrypt(password, salt, SCRYPT_KEYLEN)) as Buffer;
+  if (derived.length !== expected.length) {
+    return false;
+  }
+  return timingSafeEqual(derived, expected);
+}
+
+/**
+ * Singleton in-memory rate limit for client login attempts (10 tries / 15 min
+ * per IP). Shared across requests for this serverless instance.
+ */
+export const clientLoginRateLimiter = new RateLimiter(10, 15 * 60 * 1000);
 
 /**
  * Attempts to unlock the owner session.

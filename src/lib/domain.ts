@@ -40,6 +40,8 @@ export interface Client {
   slug: string;
   /** Pack close threshold in ARS, stored as integer cents. */
   packThresholdCents: number;
+  /** Optional login username. Nullable (null = no credentials, shared link). */
+  username: string | null;
   createdAt: Date;
 }
 
@@ -48,6 +50,10 @@ export interface NewClient {
   name: string;
   slug: string;
   packThresholdCents: number;
+  /** Optional login username (lowercase). Omit/null = no credentials. */
+  username?: string | null;
+  /** Optional scrypt hash of the login password. Never returned to the UI. */
+  passwordHash?: string | null;
 }
 
 /** Fields the owner may edit on an existing client. */
@@ -55,6 +61,15 @@ export interface ClientUpdate {
   name?: string;
   slug?: string;
   packThresholdCents?: number;
+  /** Optional login username. `undefined` keeps the current value. */
+  username?: string | null;
+  /** Optional scrypt hash. `undefined` keeps the current value. */
+  passwordHash?: string | null;
+}
+
+/** Validates a client login username (lowercase letters/digits/_- , 3-32). */
+export function isValidUsername(username: string): boolean {
+  return /^[a-z0-9_-]{3,32}$/.test(username);
 }
 
 /**

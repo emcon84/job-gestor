@@ -27,6 +27,18 @@ import type {
   TaskUpdate,
 } from "./domain";
 
+/**
+ * Login credentials of a client, returned only by the credential lookup used
+ * during client login. The password hash is NEVER part of the `Client` type
+ * that reaches the UI.
+ */
+export interface ClientCredentials {
+  clientId: string;
+  slug: string;
+  username: string;
+  passwordHash: string;
+}
+
 /** Client data-access contract. */
 export interface ClientRepository {
   /** Lists all clients (catalog order). */
@@ -35,6 +47,12 @@ export interface ClientRepository {
   getClient(id: string): Promise<Client | null>;
   /** Returns a client by portal slug, or null. */
   getClientBySlug(slug: string): Promise<Client | null>;
+  /**
+   * Returns the client's credentials (id, slug, username, passwordHash) for a
+   * username, or null when no client has that username. Only clients that have
+   * credentials set are returned.
+   */
+  getClientByUsername(username: string): Promise<ClientCredentials | null>;
   /** Creates a client. */
   createClient(input: NewClient): Promise<Client>;
   /** Updates a client's name / slug / pack threshold. Returns null when missing. */
