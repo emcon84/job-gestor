@@ -98,7 +98,7 @@ export function buildReportDefinition({
       margin: [0, 0, 0, 6],
     },
     {
-      text: `Pendiente del abono actual: ${formatArs(summary.pendingPackCents)}`,
+      text: `Total pendiente de pago: ${formatArs(summary.pendingPackCents)}`,
       fontSize: 10,
       margin: [0, 0, 2, 0],
     },

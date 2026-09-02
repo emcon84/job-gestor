@@ -162,20 +162,20 @@ describe("computePacks", () => {
     expect(s.pendingPackCents).toBe(80_000_00);
   });
 
-  it("unpaid overflow carries into the next pack's pending", () => {
+  it("counts unpaid tasks from closed packs in the pending total", () => {
     const tasks = [
       makeTask({ id: "a", amountArs: 140_000_00, createdAt: new Date("2026-01-01") }),
       makeTask({ id: "b", amountArs: 30_000_00, createdAt: new Date("2026-01-02") }),
     ];
     const s = computePacks(tasks);
-    // 170k -> pack1 closes, 20k overflow starts pack2; task b (30k) is unpaid,
-    // so 10k went to the closed pack and 20k remain pending in pack 2.
+    // 170k -> pack1 closes at 150k, 20k overflow starts pack2. Task b (30k) is
+    // unpaid: 10k closed pack 1, 20k overflow. BOTH still count as debt.
     expect(s.closedPacks).toBe(1);
     expect(s.packAccumulatedCents).toBe(20_000_00);
-    expect(s.pendingPackCents).toBe(20_000_00);
+    expect(s.pendingPackCents).toBe(170_000_00);
   });
 
-  it("paid task that crosses the threshold only subtracts its current-pack portion", () => {
+  it("excludes paid tasks from the pending total even across pack boundaries", () => {
     const tasks = [
       makeTask({ id: "a", amountArs: 140_000_00, createdAt: new Date("2026-01-01") }),
       makeTask({
@@ -186,9 +186,9 @@ describe("computePacks", () => {
       }),
     ];
     const s = computePacks(tasks);
-    // Task b is paid: 10k of it closed pack 1 (irrelevant), 20k overflow is
-    // paid too, so nothing remains pending in pack 2.
+    // Task b is paid, so only task a (140k) is unpaid debt; the paid 20k
+    // overflow is excluded everywhere.
     expect(s.packAccumulatedCents).toBe(20_000_00);
-    expect(s.pendingPackCents).toBe(0);
+    expect(s.pendingPackCents).toBe(140_000_00);
   });
 });

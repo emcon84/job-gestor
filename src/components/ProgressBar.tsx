@@ -4,9 +4,9 @@ import { formatArs } from "@/lib/format";
 
 /**
  * Progress toward the next 150.000 ARS pack close, based on what the client
- * still OWES (pendingPackCents). Paid tasks subtract from the bar — the client
- * may pay tasks individually, so the bar shows the remaining debt, not the raw
- * accumulated total.
+ * still OWES (pendingPackCents). The pending amount is the sum of every task
+ * not marked "paid", across all packs — closing a pack never hides an unpaid
+ * task. Paid tasks subtract from the bar the same way.
  */
 export default function ProgressBar({
   summary,

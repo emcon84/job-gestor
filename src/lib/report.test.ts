@@ -76,7 +76,7 @@ describe("buildReportDefinition", () => {
     });
 
     const texts = doc.content.filter((c) => "text" in c).map((c) => c.text);
-    expect(texts).toContain("Pendiente del abono actual: AR$ 10.000,00");
+    expect(texts).toContain("Total pendiente de pago: AR$ 160.000,00");
     expect(texts).toContain("Abono actual: 2");
     expect(texts).toContain("Abonos cerrados: 1");
   });

@@ -19,7 +19,7 @@ export interface PackSummary {
   currentPack: number;
   /** Amount accumulated in the current pack (includes carried overflow). Range [0, threshold). */
   packAccumulatedCents: number;
-  /** Unpaid portion of the current pack — what the client still owes toward the next close. */
+  /** Total unpaid task amounts across ALL packs — the client's real outstanding debt. */
   pendingPackCents: number;
   /** Amount that rolled over into the current pack when the previous one closed. */
   overflowCents: number;
@@ -33,6 +33,10 @@ export interface PackSummary {
  * Tasks are ordered chronologically by `createdAt` (stable tie-break), then a
  * running cumulative sum is taken; each time the running total reaches the
  * threshold, a pack closes and the remainder carries into the next one.
+ *
+ * `pendingPackCents` is the client's true outstanding debt: the sum of every
+ * task not marked "paid", regardless of which pack it falls into. Closing a
+ * pack never hides an unpaid task from the pending bar.
  */
 export function computePacks(
   tasks: Task[],
@@ -62,24 +66,16 @@ export function computePacks(
     }
   }
 
-  // The current (partial) pack is the tail of the chronological total: the
-  // most recent portions that sum to `accumulated`. Walk it backwards and sum
-  // only the UNPAID portions — paid tasks subtract from what the client owes.
+  // The client owes the full amount of every task not marked "paid", summed
+  // across ALL packs. A task whose cost fell into a closed pack is still unpaid
+  // debt — it must not vanish from the bar just because a pack boundary was
+  // crossed. Paid tasks are always excluded.
   let pendingPackCents = 0;
-  let remaining = accumulated;
-  for (const task of [...ordered].reverse()) {
-    if (remaining <= 0) {
-      break;
-    }
+  for (const task of ordered) {
     const amount = task.amountArs ?? 0;
-    if (amount <= 0) {
-      continue;
+    if (amount > 0 && task.paymentState !== "paid") {
+      pendingPackCents += amount;
     }
-    const portion = Math.min(amount, remaining);
-    if (task.paymentState !== "paid") {
-      pendingPackCents += portion;
-    }
-    remaining -= portion;
   }
 
   return {
