@@ -219,6 +219,54 @@ describe("buildReportDefinition", () => {
   });
 });
 
+describe("buildReportDefinition unpaid filter", () => {
+  const tasks = [
+    makeTask({ id: "t1", title: "Pagada", paymentState: "paid" }),
+    makeTask({ id: "t2", title: "Pendiente", paymentState: "pending" }),
+    makeTask({ id: "t3", title: "Sin estado", paymentState: null }),
+    makeTask({ id: "t4", title: "Sin monto", amountArs: 0 }),
+  ];
+
+  function unpaidBody(list: Task[]) {
+    const doc = buildReportDefinition({
+      client: makeClient(),
+      tasks: list,
+      summary: computePacks(list),
+      filter: "unpaid",
+    });
+    return { doc, table: findTable(doc) as { table: { body: unknown[][] } } | undefined };
+  }
+
+  it("lists only tasks with an amount that are not paid", () => {
+    const { table } = unpaidBody(tasks);
+    const titles = table!.table.body.slice(1).map((row) => row[0]);
+    expect(titles).toEqual(["Pendiente", "Sin estado"]);
+  });
+
+  it("marks the title as unpaid-only", () => {
+    const { doc } = unpaidBody(tasks);
+    expect((doc.content[0] as { text: string }).text).toBe(
+      "Reporte de tareas pendientes de pago — Acme SA",
+    );
+  });
+
+  it("shows a specific note when nothing is unpaid", () => {
+    const { doc, table } = unpaidBody([tasks[0]]);
+    expect(table).toBeUndefined();
+    expect(texts(doc)).toContain("Sin tareas pendientes de pago.");
+  });
+
+  it("keeps every task when the filter is omitted", () => {
+    const doc = buildReportDefinition({
+      client: makeClient(),
+      tasks,
+      summary: computePacks(tasks),
+    });
+    const body = (findTable(doc) as { table: { body: unknown[][] } }).table.body;
+    expect(body).toHaveLength(5);
+  });
+});
+
 describe("paymentLabel", () => {
   it("maps paid, pending, and null states to Spanish labels", () => {
     expect(paymentLabel("paid")).toBe("Pagado");

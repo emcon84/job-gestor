@@ -60,6 +60,13 @@ export function paymentLabel(
   return "Sin pago";
 }
 
+export type ReportFilter = "all" | "unpaid";
+
+/** Same criterion as the abono debt in `computePacks`: has an amount and isn't paid. */
+export function isUnpaid(task: Task): boolean {
+  return (task.amountArs ?? 0) > 0 && task.paymentState !== "paid";
+}
+
 function tableHeaderCell(text: string): ReportHeaderCell {
   return { text, bold: true, fillColor: HEADER_FILL };
 }
@@ -68,14 +75,20 @@ export function buildReportDefinition({
   client,
   tasks,
   summary,
+  filter = "all",
 }: {
   client: Pick<Client, "name" | "slug" | "packThresholdCents">;
   tasks: Task[];
   summary: PackSummary;
+  filter?: ReportFilter;
 }): ReportDefinition {
+  const unpaidOnly = filter === "unpaid";
+  const listed = unpaidOnly ? tasks.filter(isUnpaid) : tasks;
   const content: ReportContent[] = [
     {
-      text: `Reporte de tareas — ${client.name}`,
+      text: unpaidOnly
+        ? `Reporte de tareas pendientes de pago — ${client.name}`
+        : `Reporte de tareas — ${client.name}`,
       fontSize: 16,
       bold: true,
       margin: [0, 0, 0, 6],
@@ -129,9 +142,9 @@ export function buildReportDefinition({
     margin: [0, 18, 0, 6],
   });
 
-  if (tasks.length === 0) {
+  if (listed.length === 0) {
     content.push({
-      text: "Sin tareas.",
+      text: unpaidOnly ? "Sin tareas pendientes de pago." : "Sin tareas.",
       fontSize: 10,
       italics: true,
       color: "#666666",
@@ -145,7 +158,7 @@ export function buildReportDefinition({
       tableHeaderCell("Pago"),
       tableHeaderCell("Vencimiento"),
     ];
-    const rows: (string | ReportHeaderCell)[][] = tasks.map((task) => [
+    const rows: (string | ReportHeaderCell)[][] = listed.map((task) => [
       task.title,
       task.area,
       STATUS_LABELS[task.status],

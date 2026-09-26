@@ -86,6 +86,14 @@ export default async function OwnerClientPage({
               <FileDown className="h-4 w-4" aria-hidden />
               Descargar reporte PDF
             </a>
+            <a
+              href={`/api/report?clientId=${client.id}&filter=unpaid`}
+              download
+              className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-card-border bg-surface px-3 py-2 text-sm text-secondary transition-colors hover:border-accent hover:text-primary"
+            >
+              <FileDown className="h-4 w-4" aria-hidden />
+              PDF solo impagas
+            </a>
           </div>
         </div>
       </header>

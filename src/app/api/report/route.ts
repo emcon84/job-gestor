@@ -12,7 +12,9 @@ export const dynamic = "force-dynamic";
  * the exact same data in the browser. The report just exports it as a PDF.
  */
 export async function GET(request: Request): Promise<Response> {
-  const clientId = new URL(request.url).searchParams.get("clientId");
+  const params = new URL(request.url).searchParams;
+  const clientId = params.get("clientId");
+  const filter = params.get("filter") === "unpaid" ? "unpaid" : "all";
   if (!clientId) {
     return Response.json({ error: "Falta clientId." }, { status: 400 });
   }
@@ -25,7 +27,7 @@ export async function GET(request: Request): Promise<Response> {
 
   const tasks = await repo.listTasksByClient(client.id);
   const summary = computePacks(tasks, client.packThresholdCents);
-  const doc = buildReportDefinition({ client, tasks, summary });
+  const doc = buildReportDefinition({ client, tasks, summary, filter });
 
   // Server-only dynamic import: pdfmake is a webpack UMD bundle, so it must
   // never be statically imported (it would bloat the client bundle). The
@@ -45,7 +47,7 @@ export async function GET(request: Request): Promise<Response> {
   return new Response(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="reporte-${client.slug}.pdf"`,
+      "Content-Disposition": `attachment; filename="reporte-${filter === "unpaid" ? "impagas-" : ""}${client.slug}.pdf"`,
     },
   });
 }
