@@ -81,31 +81,16 @@ describe("buildReportDefinition", () => {
     expect(texts).toContain("Abonos cerrados: 1");
   });
 
-  it("renders the overflow line only when the summary has overflow", () => {
-    const client = makeClient();
-    const noOverflow = buildReportDefinition({
-      client,
-      tasks: [makeTask({ amountArs: 40_000_00 })],
-      summary: computePacks([makeTask({ amountArs: 40_000_00 })], 150_000_00),
-    });
-    const noOverflowTexts = noOverflow.content
-      .filter((c) => "text" in c)
-      .map((c) => c.text);
-    expect(noOverflowTexts.some((t) => t.startsWith("Excedente"))).toBe(false);
-
+  it("never shows the accumulated overflow to the client", () => {
     const tasks = [
       makeTask({ amountArs: 140_000_00 }),
       makeTask({ id: "t2", amountArs: 30_000_00 }),
     ];
-    const overflow = buildReportDefinition({
-      client,
-      tasks,
-      summary: computePacks(tasks, 150_000_00),
-    });
-    const overflowTexts = overflow.content
-      .filter((c) => "text" in c)
-      .map((c) => c.text);
-    expect(overflowTexts).toContain("Excedente acumulado: AR$ 20.000,00");
+    const summary = computePacks(tasks, 150_000_00);
+    expect(summary.overflowCents).toBeGreaterThan(0);
+
+    const doc = buildReportDefinition({ client: makeClient(), tasks, summary });
+    expect(texts(doc).some((t) => t.startsWith("Excedente"))).toBe(false);
   });
 
   it("builds a tasks table with a header row plus one row per task", () => {

@@ -127,14 +127,6 @@ export function buildReportDefinition({
     },
   ];
 
-  if (summary.overflowCents > 0) {
-    content.push({
-      text: `Excedente acumulado: ${formatArs(summary.overflowCents)}`,
-      fontSize: 10,
-      margin: [0, 2, 0, 0],
-    });
-  }
-
   content.push({
     text: "Tareas",
     fontSize: 12,
