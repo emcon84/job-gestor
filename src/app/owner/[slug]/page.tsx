@@ -41,7 +41,9 @@ export default async function OwnerClientPage({
     repo.listServicesByClient(client.id),
   ]);
   const columns = groupByStatus(tasks);
-  const packSummary = computePacks(tasks, client.packThresholdCents);
+  const packSummary = computePacks(tasks, client.packThresholdCents, {
+    hourlyRateCents: client.hourlyRateCents,
+  });
   const r2Issue = r2PublicBaseUrlIssue();
 
   return (

@@ -26,7 +26,9 @@ export default async function ClientPortalPage({
     repo.listTasksByClient(client.id),
     repo.listServicesByClient(client.id),
   ]);
-  const packSummary = computePacks(tasks, client.packThresholdCents);
+  const packSummary = computePacks(tasks, client.packThresholdCents, {
+    hourlyRateCents: client.hourlyRateCents,
+  });
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-6 pb-28">

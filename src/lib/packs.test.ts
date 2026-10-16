@@ -193,3 +193,47 @@ describe("computePacks", () => {
     expect(s.pendingPackCents).toBe(140_000_00);
   });
 });
+
+describe("computePacks for hourly clients", () => {
+  const now = new Date("2026-03-05T12:00:00Z");
+  const worked = (hours: number) => [
+    {
+      id: "s",
+      taskId: "t1",
+      startedAt: new Date("2026-03-01T10:00:00Z"),
+      endedAt: new Date(new Date("2026-03-01T10:00:00Z").getTime() + hours * 3_600_000),
+    },
+  ];
+
+  it("uses tracked hours x rate instead of the stored amount", () => {
+    const tasks = [
+      makeTask({ id: "a", amountArs: 999_99, workSessions: worked(2) }),
+    ];
+    const s = computePacks(tasks, 150_000_00, { hourlyRateCents: 10_000_00, now });
+    expect(s.pendingPackCents).toBe(20_000_00);
+    expect(s.packAccumulatedCents).toBe(20_000_00);
+  });
+
+  it("closes packs on the effective amount and skips paid tasks", () => {
+    const tasks = [
+      makeTask({ id: "a", createdAt: new Date("2026-01-01"), workSessions: worked(20) }),
+      makeTask({
+        id: "b",
+        createdAt: new Date("2026-01-02"),
+        paymentState: "paid",
+        workSessions: worked(1),
+      }),
+    ];
+    const s = computePacks(tasks, 150_000_00, { hourlyRateCents: 10_000_00, now });
+    // 20h + 1h = 210k effective -> one pack closed, 60k carried.
+    expect(s.closedPacks).toBe(1);
+    expect(s.packAccumulatedCents).toBe(60_000_00);
+    expect(s.pendingPackCents).toBe(200_000_00);
+  });
+
+  it("ignores the hourly option when the rate is null (pack client unchanged)", () => {
+    const tasks = [makeTask({ id: "a", amountArs: 50_000_00, workSessions: worked(5) })];
+    const s = computePacks(tasks, 150_000_00, { hourlyRateCents: null, now });
+    expect(s.pendingPackCents).toBe(50_000_00);
+  });
+});

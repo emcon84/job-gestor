@@ -26,7 +26,9 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   const tasks = await repo.listTasksByClient(client.id);
-  const summary = computePacks(tasks, client.packThresholdCents);
+  const summary = computePacks(tasks, client.packThresholdCents, {
+    hourlyRateCents: client.hourlyRateCents,
+  });
   const doc = buildReportDefinition({ client, tasks, summary, filter });
 
   // Server-only dynamic import: pdfmake is a webpack UMD bundle, so it must

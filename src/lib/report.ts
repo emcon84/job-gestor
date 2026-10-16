@@ -9,6 +9,13 @@
 import type { Client, Task } from "./domain";
 import { STATUS_LABELS } from "./domain";
 import { formatArs, formatDateEs } from "./format";
+import {
+  effectiveAmountCents,
+  formatHours,
+  formatLocalTime,
+  totalWorkedMs,
+  workedByDay,
+} from "./hours";
 import type { PackSummary } from "./packs";
 
 export interface ReportHeaderCell {
@@ -62,13 +69,71 @@ export function paymentLabel(
 
 export type ReportFilter = "all" | "unpaid";
 
-/** Same criterion as the abono debt in `computePacks`: has an amount and isn't paid. */
-export function isUnpaid(task: Task): boolean {
-  return (task.amountArs ?? 0) > 0 && task.paymentState !== "paid";
+/**
+ * Same criterion as the abono debt in `computePacks`: has an amount and is not
+ * paid. `amount` defaults to the stored amount; hourly clients pass the
+ * effective (tracked-hours) amount.
+ */
+export function isUnpaid(task: Task, amount: number = task.amountArs): boolean {
+  return (amount ?? 0) > 0 && task.paymentState !== "paid";
 }
 
 function tableHeaderCell(text: string): ReportHeaderCell {
   return { text, bold: true, fillColor: HEADER_FILL };
+}
+
+/** Formats a 'YYYY-MM-DD' day key as dd/mm/aaaa without any time-zone shift. */
+function formatDayKey(dayKey: string): string {
+  const [y, m, d] = dayKey.split("-");
+  return `${d}/${m}/${y}`;
+}
+
+/** Per-task, per-day worked sessions (hourly clients only). */
+function buildSessionSections(tasks: Task[], now: Date): ReportContent[] {
+  const sections: ReportContent[] = [];
+  for (const task of tasks) {
+    const days = workedByDay(task, now);
+    if (days.length === 0) {
+      continue;
+    }
+    const rows: (string | ReportHeaderCell)[][] = [];
+    for (const day of days) {
+      for (const span of day.sessions) {
+        const spanMs = (span.end ?? now).getTime() - span.start.getTime();
+        const endLabel = span.end ? formatLocalTime(span.end) : "en curso";
+        rows.push([
+          formatDayKey(day.dayKey),
+          `${formatLocalTime(span.start)} – ${endLabel}`,
+          formatHours(spanMs),
+        ]);
+      }
+    }
+    sections.push(
+      { text: task.title, fontSize: 10, bold: true, margin: [0, 10, 0, 4] },
+      {
+        layout: "lightHorizontalLines",
+        table: {
+          headerRows: 1,
+          widths: ["auto", "*", "auto"],
+          body: [
+            [
+              tableHeaderCell("Fecha"),
+              tableHeaderCell("Horario"),
+              tableHeaderCell("Horas"),
+            ],
+            ...rows,
+          ],
+        },
+      },
+    );
+  }
+  if (sections.length === 0) {
+    return [];
+  }
+  return [
+    { text: "Detalle de horas", fontSize: 12, bold: true, margin: [0, 18, 0, 0] },
+    ...sections,
+  ];
 }
 
 export function buildReportDefinition({
@@ -76,14 +141,26 @@ export function buildReportDefinition({
   tasks,
   summary,
   filter = "all",
+  now = new Date(),
 }: {
-  client: Pick<Client, "name" | "slug" | "packThresholdCents">;
+  client: Pick<Client, "name" | "slug" | "packThresholdCents"> & {
+    hourlyRateCents?: number | null;
+  };
   tasks: Task[];
   summary: PackSummary;
   filter?: ReportFilter;
+  /** Clock used to count running sessions. Defaults to the current time. */
+  now?: Date;
 }): ReportDefinition {
+  const hourlyRateCents = client.hourlyRateCents ?? null;
+  const amountOf = (task: Task): number =>
+    hourlyRateCents !== null
+      ? effectiveAmountCents(task, { hourlyRateCents }, now)
+      : (task.amountArs ?? 0);
   const unpaidOnly = filter === "unpaid";
-  const listed = unpaidOnly ? tasks.filter(isUnpaid) : tasks;
+  const listed = unpaidOnly
+    ? tasks.filter((t) => isUnpaid(t, amountOf(t)))
+    : tasks;
   const content: ReportContent[] = [
     {
       text: unpaidOnly
@@ -100,12 +177,15 @@ export function buildReportDefinition({
       margin: [0, 0, 0, 4],
     },
     {
-      text: `Abono mensual: ${formatArs(client.packThresholdCents)}`,
+      text:
+        hourlyRateCents !== null
+          ? `Tarifa por hora: ${formatArs(hourlyRateCents)}`
+          : `Abono mensual: ${formatArs(client.packThresholdCents)}`,
       fontSize: 10,
       margin: [0, 0, 0, 18],
     },
     {
-      text: "Resumen del abono",
+      text: hourlyRateCents !== null ? "Resumen" : "Resumen del abono",
       fontSize: 12,
       bold: true,
       margin: [0, 0, 0, 6],
@@ -115,17 +195,21 @@ export function buildReportDefinition({
       fontSize: 10,
       margin: [0, 0, 2, 0],
     },
-    {
-      text: `Abono actual: ${summary.currentPack}`,
-      fontSize: 10,
-      margin: [0, 2, 0, 0],
-    },
-    {
-      text: `Abonos cerrados: ${summary.closedPacks}`,
-      fontSize: 10,
-      margin: [0, 2, 0, 0],
-    },
   ];
+  if (hourlyRateCents === null) {
+    content.push(
+      {
+        text: `Abono actual: ${summary.currentPack}`,
+        fontSize: 10,
+        margin: [0, 2, 0, 0],
+      },
+      {
+        text: `Abonos cerrados: ${summary.closedPacks}`,
+        fontSize: 10,
+        margin: [0, 2, 0, 0],
+      },
+    );
+  }
 
   content.push({
     text: "Tareas",
@@ -146,6 +230,7 @@ export function buildReportDefinition({
       tableHeaderCell("Título"),
       tableHeaderCell("Área"),
       tableHeaderCell("Estado"),
+      ...(hourlyRateCents !== null ? [tableHeaderCell("Horas")] : []),
       tableHeaderCell("Monto"),
       tableHeaderCell("Pago"),
       tableHeaderCell("Vencimiento"),
@@ -154,7 +239,8 @@ export function buildReportDefinition({
       task.title,
       task.area,
       STATUS_LABELS[task.status],
-      formatArs(task.amountArs ?? 0),
+      ...(hourlyRateCents !== null ? [formatHours(totalWorkedMs(task, now))] : []),
+      formatArs(amountOf(task)),
       paymentLabel(task.paymentState),
       task.paymentDueDate ? formatDateEs(task.paymentDueDate) : "—",
     ]);
@@ -162,10 +248,17 @@ export function buildReportDefinition({
       layout: "lightHorizontalLines",
       table: {
         headerRows: 1,
-        widths: ["*", "auto", "auto", "auto", "auto", "auto"],
+        widths:
+          hourlyRateCents !== null
+            ? ["*", "auto", "auto", "auto", "auto", "auto", "auto"]
+            : ["*", "auto", "auto", "auto", "auto", "auto"],
         body: [headerRow, ...rows],
       },
     });
+
+    if (hourlyRateCents !== null) {
+      content.push(...buildSessionSections(listed, now));
+    }
   }
 
   return {

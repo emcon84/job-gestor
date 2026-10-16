@@ -10,6 +10,7 @@
  * edit always produces a correct, up-to-date summary.
  */
 import type { Task } from "./domain";
+import { effectiveAmountCents } from "./hours";
 
 /** 150.000 ARS, in integer cents. */
 export const PACK_THRESHOLD_ARS_CENTS = 150_000_00;
@@ -27,6 +28,13 @@ export interface PackSummary {
   closedPacks: number;
 }
 
+export interface PackOptions {
+  /** Client hourly rate in cents. null/omitted = pack mode (stored amounts). */
+  hourlyRateCents?: number | null;
+  /** Clock used to count running sessions. Defaults to the current time. */
+  now?: Date;
+}
+
 /**
  * Computes pack boundaries from a list of tasks.
  *
@@ -41,7 +49,16 @@ export interface PackSummary {
 export function computePacks(
   tasks: Task[],
   threshold: number = PACK_THRESHOLD_ARS_CENTS,
+  options: PackOptions = {},
 ): PackSummary {
+  const hourlyRateCents = options.hourlyRateCents ?? null;
+  const now = options.now ?? new Date();
+  // Hourly clients are billed on tracked time; pack clients on the stored amount.
+  const amountOf = (task: Task): number | null | undefined =>
+    hourlyRateCents === null
+      ? task.amountArs
+      : effectiveAmountCents(task, { hourlyRateCents }, now);
+
   // Order chronologically (oldest first). Array.prototype.sort is stable, so
   // tasks with identical timestamps keep their input order as a tie-break.
   const ordered = [...tasks].sort(
@@ -53,10 +70,11 @@ export function computePacks(
   let currentPackStart = 0;
 
   for (const task of ordered) {
-    if (task.amountArs === null || task.amountArs === undefined) {
+    const amount = amountOf(task);
+    if (amount === null || amount === undefined) {
       continue;
     }
-    accumulated += task.amountArs;
+    accumulated += amount;
     while (accumulated >= threshold) {
       accumulated -= threshold;
       closedPacks += 1;
@@ -72,7 +90,7 @@ export function computePacks(
   // crossed. Paid tasks are always excluded.
   let pendingPackCents = 0;
   for (const task of ordered) {
-    const amount = task.amountArs ?? 0;
+    const amount = amountOf(task) ?? 0;
     if (amount > 0 && task.paymentState !== "paid") {
       pendingPackCents += amount;
     }

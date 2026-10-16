@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Client, Task } from "./domain";
 import { buildReportDefinition, paymentLabel } from "./report";
 import { computePacks } from "./packs";
+import { formatArs } from "./format";
 
 function makeClient(overrides: Partial<Client> = {}): Client {
   return {
@@ -259,5 +260,112 @@ describe("paymentLabel", () => {
     expect(paymentLabel("paid")).toBe("Pagado");
     expect(paymentLabel("pending")).toBe("Pendiente");
     expect(paymentLabel(null)).toBe("Sin pago");
+  });
+});
+describe("buildReportDefinition for hourly clients", () => {
+  const now = new Date("2026-03-05T12:00:00Z");
+  const hourlyClient = makeClient({ hourlyRateCents: 10_000_00 });
+  const sessions = [
+    {
+      id: "s1",
+      taskId: "t1",
+      // 10:00-11:30 local on 2026-03-01
+      startedAt: new Date("2026-03-01T13:00:00Z"),
+      endedAt: new Date("2026-03-01T14:30:00Z"),
+    },
+    {
+      id: "s2",
+      taskId: "t1",
+      // 09:00-10:00 local on 2026-03-02
+      startedAt: new Date("2026-03-02T12:00:00Z"),
+      endedAt: new Date("2026-03-02T13:00:00Z"),
+    },
+  ];
+  const tasks = [makeTask({ title: "Landing", amountArs: 1, workSessions: sessions })];
+
+  function build(overrides: Partial<Parameters<typeof buildReportDefinition>[0]> = {}) {
+    return buildReportDefinition({
+      client: hourlyClient,
+      tasks,
+      summary: computePacks(tasks, hourlyClient.packThresholdCents, {
+        hourlyRateCents: 10_000_00,
+        now,
+      }),
+      now,
+      ...overrides,
+    });
+  }
+
+  it("shows worked hours and the effective amount per task", () => {
+    const doc = build();
+    const table = findTable(doc) as { table: { body: unknown[][] } };
+    const header = (table.table.body[0] as { text: string }[]).map((c) => c.text);
+    expect(header).toContain("Horas");
+    const row = table.table.body[1] as string[];
+    expect(row).toContain("2h 30m");
+    expect(row).toContain(formatArs(25_000_00));
+  });
+
+  it("states the hourly rate and the pending total", () => {
+    const all = texts(build()).join("\n");
+    expect(all).toContain(`Tarifa por hora: ${formatArs(10_000_00)}`);
+    expect(all).toContain(`Total pendiente de pago: ${formatArs(25_000_00)}`);
+    expect(all).not.toContain("Abono actual");
+  });
+
+  it("adds a per-day sessions section for each task", () => {
+    const doc = build();
+    const all = texts(doc).join("\n");
+    expect(all).toContain("Detalle de horas");
+    expect(all).toContain("Landing");
+    const dayTable = doc.content.filter(
+      (c) => "table" in c && c !== findTable(doc),
+    )[0] as { table: { body: (string | { text: string })[][] } };
+    const flat = dayTable.table.body.map((r) =>
+      r.map((c) => (typeof c === "string" ? c : c.text)),
+    );
+    expect(flat[1]).toEqual(["01/03/2026", "10:00 – 11:30", "1h 30m"]);
+    expect(flat[2]).toEqual(["02/03/2026", "09:00 – 10:00", "1h 00m"]);
+  });
+
+  it("shows a running session as in progress", () => {
+    const running = [
+      makeTask({
+        workSessions: [
+          {
+            id: "r",
+            taskId: "t1",
+            startedAt: new Date("2026-03-05T13:00:00Z"),
+            endedAt: null,
+          },
+        ],
+      }),
+    ];
+    const doc = build({ tasks: running, now: new Date("2026-03-05T14:00:00Z") });
+    const dayTable = doc.content.filter(
+      (c) => "table" in c && c !== findTable(doc),
+    )[0] as { table: { body: string[][] } };
+    expect(dayTable.table.body[1][1]).toBe("10:00 – en curso");
+  });
+
+  it("filters unpaid tasks by their effective amount", () => {
+    const idle = makeTask({ id: "x", title: "Idle", amountArs: 50_000_00, workSessions: [] });
+    const doc = build({ tasks: [...tasks, idle], filter: "unpaid" });
+    const table = findTable(doc) as { table: { body: unknown[][] } };
+    // Only the task with tracked hours is billable; the idle one is 0 ARS.
+    expect(table.table.body).toHaveLength(2);
+  });
+
+  it("leaves pack clients without the hourly columns or sessions section", () => {
+    const packDoc = buildReportDefinition({
+      client: makeClient(),
+      tasks,
+      summary: computePacks(tasks),
+    });
+    const all = texts(packDoc).join("\n");
+    expect(all).not.toContain("Detalle de horas");
+    expect(all).toContain("Abono mensual");
+    const table = findTable(packDoc) as { table: { body: unknown[][] } };
+    expect((table.table.body[0] as { text: string }[]).map((c) => c.text)).not.toContain("Horas");
   });
 });
