@@ -136,3 +136,18 @@ export function formatDateInput(date: Date | null): string {
   const d = String(date.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
 }
+
+/**
+ * Parses the optional hourly-rate field of a client form (pesos string).
+ * Empty -> `{ ok: true, cents: null }` (pack mode); invalid or negative ->
+ * `{ ok: false }`.
+ */
+export function parseHourlyRateInput(
+  input: string,
+): { ok: true; cents: number | null } | { ok: false } {
+  if (input.trim() === "") {
+    return { ok: true, cents: null };
+  }
+  const cents = parsePesosToCents(input);
+  return cents === null ? { ok: false } : { ok: true, cents };
+}

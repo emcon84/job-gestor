@@ -19,6 +19,9 @@ export default function ClientEdit({ client }: { client: Client }) {
   const [threshold, setThreshold] = useState(
     centsToPesosInput(client.packThresholdCents),
   );
+  const [hourlyRate, setHourlyRate] = useState(
+    centsToPesosInput(client.hourlyRateCents),
+  );
   const [username, setUsername] = useState(client.username ?? "");
   const [password, setPassword] = useState("");
   const [note, setNote] = useState(client.portalMessage ?? "");
@@ -33,6 +36,7 @@ export default function ClientEdit({ client }: { client: Client }) {
     fd.set("name", name);
     fd.set("slug", slug);
     fd.set("packThresholdArs", threshold);
+    fd.set("hourlyRate", hourlyRate);
     fd.set("username", username);
     fd.set("password", password);
     fd.set("portalMessage", note);
@@ -75,6 +79,16 @@ export default function ClientEdit({ client }: { client: Client }) {
           className="rounded-lg border border-card-border bg-surface px-3 py-2 text-sm text-primary"
         />
       </div>
+      <label className="mt-2 block text-xs text-muted">
+        Valor hora (ARS) — dejar vacío para cobro por abono
+        <input
+          value={hourlyRate}
+          onChange={(e) => setHourlyRate(e.target.value)}
+          inputMode="decimal"
+          placeholder="Valor hora ARS"
+          className="mt-1 w-full rounded-lg border border-card-border bg-surface px-3 py-2 text-sm text-primary"
+        />
+      </label>
       <div className="mt-2 grid gap-2 sm:grid-cols-2">
         <input
           value={username}

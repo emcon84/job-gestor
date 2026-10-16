@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { centsToPesosInput, formatArs, parsePesosToCents } from "./format";
+import {
+  centsToPesosInput,
+  formatArs,
+  parseHourlyRateInput,
+  parsePesosToCents,
+} from "./format";
 
 describe("formatArs", () => {
   it("formats integer cents with es-AR conventions (AR$ 1.234,56)", () => {
@@ -75,5 +80,22 @@ describe("centsToPesosInput", () => {
 
   it("returns empty for null", () => {
     expect(centsToPesosInput(null)).toBe("");
+  });
+});
+
+describe("parseHourlyRateInput", () => {
+  it("returns null cents for an empty or blank value (pack mode)", () => {
+    expect(parseHourlyRateInput("")).toEqual({ ok: true, cents: null });
+    expect(parseHourlyRateInput("   ")).toEqual({ ok: true, cents: null });
+  });
+
+  it("parses a valid pesos amount into cents", () => {
+    expect(parseHourlyRateInput("1.500,50")).toEqual({ ok: true, cents: 150050 });
+    expect(parseHourlyRateInput("0")).toEqual({ ok: true, cents: 0 });
+  });
+
+  it("rejects negative or malformed values", () => {
+    expect(parseHourlyRateInput("-5")).toEqual({ ok: false });
+    expect(parseHourlyRateInput("abc")).toEqual({ ok: false });
   });
 });

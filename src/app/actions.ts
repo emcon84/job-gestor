@@ -31,7 +31,7 @@ import {
   validateCommentAuthorName,
   validateCommentBody,
 } from "@/lib/domain";
-import { parsePesosToCents } from "@/lib/format";
+import { parseHourlyRateInput, parsePesosToCents } from "@/lib/format";
 import { getRepository } from "@/lib/store";
 import { sendPushNotifications } from "@/lib/push";
 import type {
@@ -592,6 +592,7 @@ export async function createClient(formData: FormData): Promise<ActionResult> {
   const showPackProgressRaw = formData.get("showPackProgress") ?? "";
   const portalMessage = portalMessageRaw || null;
   const showPackProgress = showPackProgressRaw === "on";
+  const hourlyRateRaw = (formData.get("hourlyRate") as string | null) ?? "";
 
   if (!name) {
     return { ok: false, error: "El nombre del cliente es obligatorio." };
@@ -610,6 +611,10 @@ export async function createClient(formData: FormData): Promise<ActionResult> {
   const cents = parsePesosToCents(thresholdRaw);
   if (cents === null) {
     return { ok: false, error: "Monto de abono inválido." };
+  }
+  const hourlyRate = parseHourlyRateInput(hourlyRateRaw);
+  if (!hourlyRate.ok) {
+    return { ok: false, error: "Valor hora inválido." };
   }
 
   let newUsername: string | null = null;
@@ -648,6 +653,7 @@ export async function createClient(formData: FormData): Promise<ActionResult> {
     passwordHash,
     portalMessage,
     showPackProgress,
+    hourlyRateCents: hourlyRate.cents,
   });
   revalidatePath("/");
   revalidatePath("/owner");
@@ -675,6 +681,7 @@ export async function updateClient(formData: FormData): Promise<ActionResult> {
   const showPackProgressRaw = formData.get("showPackProgress") ?? "";
   const portalMessage = portalMessageRaw || null;
   const showPackProgress = showPackProgressRaw === "on";
+  const hourlyRateRaw = (formData.get("hourlyRate") as string | null) ?? "";
 
   if (!id) {
     return { ok: false, error: "Falta el id del cliente." };
@@ -696,6 +703,10 @@ export async function updateClient(formData: FormData): Promise<ActionResult> {
   const cents = parsePesosToCents(thresholdRaw);
   if (cents === null) {
     return { ok: false, error: "Monto de abono inválido." };
+  }
+  const hourlyRate = parseHourlyRateInput(hourlyRateRaw);
+  if (!hourlyRate.ok) {
+    return { ok: false, error: "Valor hora inválido." };
   }
 
   let newUsername: string | undefined;
@@ -748,6 +759,7 @@ export async function updateClient(formData: FormData): Promise<ActionResult> {
     ...(newPasswordHash !== undefined ? { passwordHash: newPasswordHash } : {}),
     portalMessage,
     showPackProgress,
+    hourlyRateCents: hourlyRate.cents,
   });
   if (!updated) {
     return { ok: false, error: "No se encontró el cliente." };
@@ -866,4 +878,57 @@ export async function unsubscribePush(formData: FormData): Promise<ActionResult>
   const repo = await getRepository();
   await repo.deletePushSubscriptionByEndpoint(endpoint);
   return { ok: true, message: "Notificaciones desactivadas." };
+}
+
+/**
+ * Owner-only: starts the work timer on a task (hourly billing). A task that is
+ * done (or missing) cannot be timed; starting while already running is a no-op.
+ */
+export async function startTimer(taskId: string): Promise<ActionResult> {
+  if (!(await isOwner())) {
+    return { ok: false, error: "No autorizado." };
+  }
+  if (!taskId) {
+    return { ok: false, error: "Falta el id de la tarea." };
+  }
+  const repo = await getRepository();
+  const task = await repo.getTask(taskId);
+  if (!task) {
+    return { ok: false, error: "No se encontró la tarea." };
+  }
+  if (task.status === "done") {
+    return {
+      ok: false,
+      error: "La tarea está terminada: no se puede iniciar el cronómetro.",
+    };
+  }
+  const session = await repo.startWorkSession(taskId);
+  if (!session) {
+    return { ok: false, error: "No se pudo iniciar el cronómetro." };
+  }
+  const client = await repo.getClient(task.clientId);
+  revalidateClient(client?.slug);
+  return { ok: true, message: "Cronómetro iniciado." };
+}
+
+/** Owner-only: stops the running work timer of a task. */
+export async function stopTimer(taskId: string): Promise<ActionResult> {
+  if (!(await isOwner())) {
+    return { ok: false, error: "No autorizado." };
+  }
+  if (!taskId) {
+    return { ok: false, error: "Falta el id de la tarea." };
+  }
+  const repo = await getRepository();
+  const task = await repo.getTask(taskId);
+  if (!task) {
+    return { ok: false, error: "No se encontró la tarea." };
+  }
+  const session = await repo.stopWorkSession(taskId);
+  if (!session) {
+    return { ok: false, error: "No hay un cronómetro en curso para esta tarea." };
+  }
+  const client = await repo.getClient(task.clientId);
+  revalidateClient(client?.slug);
+  return { ok: true, message: "Cronómetro detenido." };
 }
