@@ -6,8 +6,10 @@ import { ChevronRight } from "lucide-react";
 import { updateTask } from "@/app/actions";
 import { PRIORITY_LABELS, type ServiceOption, type Task, type TaskStatus } from "@/lib/domain";
 import { formatArs } from "@/lib/format";
+import { effectiveAmountCents, formatHours, totalWorkedMs } from "@/lib/hours";
 import AttachmentThumbs from "@/components/AttachmentThumbs";
 import TaskDetailModal from "@/components/TaskDetailModal";
+import { hasRunningSession, useNow } from "@/components/work-hours";
 import {
   COLUMNS,
   MOVE_BUTTON_COLOR,
@@ -25,11 +27,22 @@ const COLUMN_ACCENT: Record<TaskStatus, string> = {
 export default function KanbanBoard({
   columns,
   services,
+  hourlyRateCents,
 }: {
   columns: Record<TaskStatus, Task[]>;
   services: ServiceOption[];
+  /** Client hourly rate in cents; null = pack mode. */
+  hourlyRateCents: number | null;
 }) {
-  const [selected, setSelected] = useState<Task | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Resolve from the current columns so the drawer reflects refreshed data
+  // (e.g. a just-started work session) instead of a stale snapshot.
+  const selected =
+    selectedId === null
+      ? null
+      : (Object.values(columns)
+          .flat()
+          .find((t) => t.id === selectedId) ?? null);
 
   return (
     <>
@@ -54,7 +67,8 @@ export default function KanbanBoard({
                   <KanbanCard
                     key={task.id}
                     task={task}
-                    onOpen={() => setSelected(task)}
+                    hourlyRateCents={hourlyRateCents}
+                    onOpen={() => setSelectedId(task.id)}
                   />
                 ))}
               </div>
@@ -67,15 +81,27 @@ export default function KanbanBoard({
         <TaskDetailModal
           task={selected}
           services={services}
-          onClose={() => setSelected(null)}
+          hourlyRateCents={hourlyRateCents}
+          onClose={() => setSelectedId(null)}
         />
       )}
     </>
   );
 }
 
-function KanbanCard({ task, onOpen }: { task: Task; onOpen: () => void }) {
+function KanbanCard({
+  task,
+  hourlyRateCents,
+  onOpen,
+}: {
+  task: Task;
+  hourlyRateCents: number | null;
+  onOpen: () => void;
+}) {
   const router = useRouter();
+  const hourly = hourlyRateCents !== null;
+  const running = hasRunningSession(task);
+  const now = useNow(hourly && running);
   const [msg, setMsg] = useState<{ kind: "error" | "success"; text: string } | null>(
     null,
   );
@@ -120,9 +146,26 @@ function KanbanCard({ task, onOpen }: { task: Task; onOpen: () => void }) {
           />
         </div>
 
-        <p className="text-sm font-semibold text-primary">
-          {formatArs(task.amountArs)}
-        </p>
+        {hourly ? (
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <p
+              className="text-sm font-semibold text-primary"
+              suppressHydrationWarning
+            >
+              {formatHours(totalWorkedMs(task, now))} ·{" "}
+              {formatArs(effectiveAmountCents(task, { hourlyRateCents }, now))}
+            </p>
+            {running && (
+              <span className="inline-flex items-center rounded-full border border-accent/50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent">
+                En curso
+              </span>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm font-semibold text-primary">
+            {formatArs(task.amountArs)}
+          </p>
+        )}
 
         {task.paymentState && (
           <p

@@ -9,9 +9,11 @@ import {
   type Task,
 } from "@/lib/domain";
 import { formatArs, formatDateEs } from "@/lib/format";
+import { effectiveAmountCents, formatHours, totalWorkedMs } from "@/lib/hours";
 import AttachmentThumbs from "@/components/AttachmentThumbs";
 import CommentThread from "@/components/CommentThread";
 import PaymentBadge from "@/components/PaymentBadge";
+import { WorkDayList, hasRunningSession, useNow } from "@/components/work-hours";
 
 const STATUS_COLOR: Record<Task["status"], string> = {
   pending: "text-status-pending",
@@ -29,9 +31,12 @@ const STATUS_COLOR: Record<Task["status"], string> = {
  */
 export default function PortalTaskItem({
   task,
+  hourlyRateCents,
   children,
 }: {
   task: Task;
+  /** Client hourly rate in cents; null = pack mode. */
+  hourlyRateCents: number | null;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -51,7 +56,11 @@ export default function PortalTaskItem({
       </li>
 
       {open && (
-        <PortalTaskDetailModal task={task} onClose={() => setOpen(false)} />
+        <PortalTaskDetailModal
+          task={task}
+          hourlyRateCents={hourlyRateCents}
+          onClose={() => setOpen(false)}
+        />
       )}
     </>
   );
@@ -59,12 +68,16 @@ export default function PortalTaskItem({
 
 function PortalTaskDetailModal({
   task,
+  hourlyRateCents,
   onClose,
 }: {
   task: Task;
+  hourlyRateCents: number | null;
   onClose: () => void;
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
+  const hourly = hourlyRateCents !== null;
+  const now = useNow(hourly && hasRunningSession(task));
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -103,8 +116,12 @@ function PortalTaskDetailModal({
               <span className={`font-medium ${STATUS_COLOR[task.status]}`}>
                 {STATUS_LABELS[task.status]}
               </span>
-              <span className="font-medium text-primary">
-                {formatArs(task.amountArs)}
+              <span className="font-medium text-primary" suppressHydrationWarning>
+                {formatArs(
+                  hourly
+                    ? effectiveAmountCents(task, { hourlyRateCents }, now)
+                    : task.amountArs,
+                )}
               </span>
               <PaymentBadge state={task.paymentState} />
               {task.paymentDueDate && task.paymentState !== "paid" && (
@@ -140,6 +157,21 @@ function PortalTaskDetailModal({
               {task.description}
             </p>
           </section>
+
+          {hourly && (
+            <section className="space-y-2">
+              <h3 className="text-sm font-semibold text-primary">
+                Horas trabajadas
+              </h3>
+              <p
+                className="text-sm font-medium text-primary"
+                suppressHydrationWarning
+              >
+                Total: {formatHours(totalWorkedMs(task, now))}
+              </p>
+              <WorkDayList task={task} now={now} />
+            </section>
+          )}
 
           {task.attachments.length > 0 && (
             <section>

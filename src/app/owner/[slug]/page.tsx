@@ -117,7 +117,11 @@ export default async function OwnerClientPage({
         <ServiceAdmin clientId={client.id} services={services} />
       </section>
 
-      <KanbanBoard columns={columns} services={services} />
+      <KanbanBoard
+        columns={columns}
+        services={services}
+        hourlyRateCents={client.hourlyRateCents}
+      />
     </main>
   );
 }

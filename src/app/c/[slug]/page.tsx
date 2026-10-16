@@ -93,7 +93,7 @@ export default async function ClientPortalPage({
         <h2 className="mb-3 text-lg font-semibold text-primary">
           Tareas enviadas
         </h2>
-        <TaskList tasks={tasks} />
+        <TaskList tasks={tasks} hourlyRateCents={client.hourlyRateCents} />
       </section>
 
       <footer className="mt-10 border-t border-card-border pt-4 text-center">

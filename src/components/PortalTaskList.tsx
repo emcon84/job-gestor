@@ -12,6 +12,7 @@ import {
   type TaskStatus,
 } from "@/lib/domain";
 import { formatArs, formatDateEs } from "@/lib/format";
+import { effectiveAmountCents } from "@/lib/hours";
 import AttachmentThumbs from "@/components/AttachmentThumbs";
 import PaymentBadge from "@/components/PaymentBadge";
 import PortalTaskItem from "@/components/PortalTaskItem";
@@ -52,7 +53,14 @@ function matchesFilter(task: Task, filter: PaymentFilter): boolean {
  * Client-side portal list with a payment-state filter. The server TaskList
  * delegates rendering here so the client can filter without a page reload.
  */
-export default function PortalTaskList({ tasks }: { tasks: Task[] }) {
+export default function PortalTaskList({
+  tasks,
+  hourlyRateCents,
+}: {
+  tasks: Task[];
+  /** Client hourly rate in cents; null = pack mode. */
+  hourlyRateCents: number | null;
+}) {
   const router = useRouter();
   const [filter, setFilter] = useState<PaymentFilter>("all");
   const [movingId, setMovingId] = useState<string | null>(null);
@@ -120,7 +128,11 @@ export default function PortalTaskList({ tasks }: { tasks: Task[] }) {
       ) : (
         <ul className="space-y-4">
           {visible.map((task) => (
-            <PortalTaskItem key={task.id} task={task}>
+            <PortalTaskItem
+              key={task.id}
+              task={task}
+              hourlyRateCents={hourlyRateCents}
+            >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <h3 className="text-base font-semibold text-primary">
@@ -144,8 +156,15 @@ export default function PortalTaskList({ tasks }: { tasks: Task[] }) {
 
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-secondary">
                 <span>Prioridad: {PRIORITY_LABELS[task.priority]}</span>
-                <span className="font-medium text-primary">
-                  {formatArs(task.amountArs)}
+                <span
+                  className="font-medium text-primary"
+                  suppressHydrationWarning
+                >
+                  {formatArs(
+                    hourlyRateCents !== null
+                      ? effectiveAmountCents(task, { hourlyRateCents })
+                      : task.amountArs,
+                  )}
                 </span>
                 <PaymentBadge state={task.paymentState} />
                 {task.paymentDueDate && task.paymentState !== "paid" && (

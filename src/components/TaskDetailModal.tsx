@@ -3,16 +3,31 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
-import { deleteTask, updateTask } from "@/app/actions";
+import { deleteTask, startTimer, stopTimer, updateTask } from "@/app/actions";
 import {
   PRIORITY_LABELS,
   type ServiceOption,
   type Task,
   type TaskStatus,
 } from "@/lib/domain";
-import { centsToPesosInput, formatDateEs, formatDateInput } from "@/lib/format";
+import {
+  centsToPesosInput,
+  formatArs,
+  formatDateEs,
+  formatDateInput,
+} from "@/lib/format";
+import {
+  effectiveAmountCents,
+  formatHours,
+  totalWorkedMs,
+} from "@/lib/hours";
 import AttachmentThumbs from "@/components/AttachmentThumbs";
 import CommentThread from "@/components/CommentThread";
+import {
+  WorkDayList,
+  hasRunningSession,
+  useNow,
+} from "@/components/work-hours";
 import {
   COLUMNS,
   MOVE_BUTTON_COLOR,
@@ -30,10 +45,13 @@ import {
 export default function TaskDetailModal({
   task,
   services,
+  hourlyRateCents,
   onClose,
 }: {
   task: Task;
   services: ServiceOption[];
+  /** Client hourly rate in cents; null = pack mode (no timer). */
+  hourlyRateCents: number | null;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -41,6 +59,9 @@ export default function TaskDetailModal({
   const [msg, setMsg] = useState<{ kind: "error" | "success"; text: string } | null>(
     null,
   );
+  const hourly = hourlyRateCents !== null;
+  const running = hasRunningSession(task);
+  const now = useNow(running);
   const amountRef = useRef<HTMLInputElement>(null);
   const paymentRef = useRef<HTMLSelectElement>(null);
   const dueDateRef = useRef<HTMLInputElement>(null);
@@ -78,7 +99,9 @@ export default function TaskDetailModal({
   async function saveEdits() {
     const fd = new FormData();
     fd.set("id", task.id);
-    fd.set("amountArs", amountRef.current?.value ?? "");
+    if (!hourly) {
+      fd.set("amountArs", amountRef.current?.value ?? "");
+    }
     fd.set("paymentState", paymentRef.current?.value ?? "");
     fd.set("paymentDueDate", dueDateRef.current?.value ?? "");
     fd.set("serviceId", serviceRef.current?.value ?? "");
@@ -86,6 +109,16 @@ export default function TaskDetailModal({
     setMsg(
       r.ok
         ? { kind: "success", text: "Guardado." }
+        : { kind: "error", text: r.error ?? "Error." },
+    );
+    if (r.ok) router.refresh();
+  }
+
+  async function toggleTimer() {
+    const r = running ? await stopTimer(task.id) : await startTimer(task.id);
+    setMsg(
+      r.ok
+        ? { kind: "success", text: r.message ?? "Listo." }
         : { kind: "error", text: r.error ?? "Error." },
     );
     if (r.ok) router.refresh();
@@ -193,14 +226,27 @@ export default function TaskDetailModal({
               </select>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <input
-                ref={amountRef}
-                type="text"
-                inputMode="decimal"
-                defaultValue={centsToPesosInput(task.amountArs)}
-                placeholder="Monto ARS"
-                className="rounded-lg border border-card-border bg-surface px-2 py-2 text-sm text-primary"
-              />
+              {hourly ? (
+                <input
+                  type="text"
+                  readOnly
+                  aria-label="Monto calculado por horas"
+                  value={formatArs(
+                    effectiveAmountCents(task, { hourlyRateCents }, now),
+                  )}
+                  className="rounded-lg border border-card-border bg-surface px-2 py-2 text-sm text-muted"
+                  suppressHydrationWarning
+                />
+              ) : (
+                <input
+                  ref={amountRef}
+                  type="text"
+                  inputMode="decimal"
+                  defaultValue={centsToPesosInput(task.amountArs)}
+                  placeholder="Monto ARS"
+                  className="rounded-lg border border-card-border bg-surface px-2 py-2 text-sm text-primary"
+                />
+              )}
               <select
                 ref={paymentRef}
                 defaultValue={task.paymentState ?? ""}
@@ -226,6 +272,12 @@ export default function TaskDetailModal({
                 className="w-full rounded-lg border border-card-border bg-surface px-2 py-2 text-sm text-primary"
               />
             </div>
+            {hourly && (
+              <p className="text-xs text-muted">
+                El monto se calcula según las horas registradas (
+                {formatArs(hourlyRateCents)} por hora).
+              </p>
+            )}
             <p className="text-xs text-muted">
               {task.paymentDueDate
                 ? `Vence: ${formatDateEs(task.paymentDueDate)}`
@@ -239,6 +291,44 @@ export default function TaskDetailModal({
               Guardar
             </button>
           </section>
+
+          {hourly && (
+            <section className="space-y-2">
+              <h3 className="text-sm font-semibold text-primary">Cronómetro</h3>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p
+                    className="text-lg font-semibold text-primary"
+                    suppressHydrationWarning
+                  >
+                    {formatHours(totalWorkedMs(task, now))}
+                  </p>
+                  <p className="text-xs text-muted" suppressHydrationWarning>
+                    {formatArs(
+                      effectiveAmountCents(task, { hourlyRateCents }, now),
+                    )}
+                    {running && " · en curso"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={toggleTimer}
+                  disabled={task.status === "done"}
+                  className={`min-h-11 rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${
+                    running ? "bg-error" : "bg-accent"
+                  }`}
+                >
+                  {running ? "Detener" : "Iniciar"}
+                </button>
+              </div>
+              {task.status === "done" && (
+                <p className="text-xs text-muted">
+                  La tarea está terminada: el cronómetro está deshabilitado.
+                </p>
+              )}
+              <WorkDayList task={task} now={now} />
+            </section>
+          )}
 
           <section className="space-y-2">
             <h3 className="text-sm font-semibold text-primary">Estado</h3>
