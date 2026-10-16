@@ -12,6 +12,7 @@ function makeClient(overrides: Partial<Client> = {}): Client {
     username: null,
     portalMessage: null,
     showPackProgress: true,
+    hourlyRateCents: null,
     createdAt: new Date("2026-01-01T00:00:00Z"),
     ...overrides,
   };
@@ -36,6 +37,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     completedAt: null,
     attachments: [],
     comments: [],
+    workSessions: [],
     ...overrides,
   };
 }

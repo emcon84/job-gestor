@@ -3,7 +3,7 @@
  * Drizzle. Rows are mapped to the shared domain models. Edits overwrite current
  * values (no history), and deleting a task cascades to its attachments.
  */
-import { and, desc, eq, inArray, notExists } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, notExists } from "drizzle-orm";
 import type {
   Client,
   ClientUpdate,
@@ -23,6 +23,7 @@ import type {
   Task,
   TaskStatus,
   TaskUpdate,
+  WorkSession,
 } from "../domain";
 import { resolveCompletedAt } from "../domain";
 import type {
@@ -39,17 +40,20 @@ import {
   pushSubscriptions,
   services,
   tasks,
+  workSessions,
 } from "../schema";
 import type {
   AttachmentRow,
   ClientRow,
   CommentRow,
   PushSubscriptionRow,
+  WorkSessionRow,
 } from "../schema";
 
 function mapTask(
   row: (typeof tasks.$inferSelect) & { att: AttachmentRow[] },
   taskComments: Comment[],
+  taskSessions: WorkSession[] = [],
 ): Task {
   return {
     id: row.id,
@@ -75,7 +79,22 @@ function mapTask(
       sizeBytes: a.sizeBytes,
     })),
     comments: taskComments,
+    workSessions: taskSessions,
   };
+}
+
+function mapWorkSession(row: WorkSessionRow): WorkSession {
+  return {
+    id: row.id,
+    taskId: row.taskId,
+    startedAt: row.startedAt,
+    endedAt: row.endedAt,
+  };
+}
+
+/** Sorts work sessions oldest first. */
+function sortSessions(list: WorkSession[]): WorkSession[] {
+  return list.sort((a, b) => a.startedAt.getTime() - b.startedAt.getTime());
 }
 
 function mapComment(row: CommentRow): Comment {
@@ -115,6 +134,7 @@ function mapClient(row: ClientRow): Client {
     username: row.username,
     portalMessage: row.portalMessage,
     showPackProgress: row.showPackProgress,
+    hourlyRateCents: row.hourlyRateCents,
     createdAt: row.createdAt,
   };
 }
@@ -181,6 +201,7 @@ export class PostgresRepository
         passwordHash: input.passwordHash ?? null,
         portalMessage: input.portalMessage ?? null,
         showPackProgress: input.showPackProgress ?? true,
+        hourlyRateCents: input.hourlyRateCents ?? null,
       })
       .returning();
     return mapClient(row);
@@ -208,6 +229,10 @@ export class PostgresRepository
           update.showPackProgress !== undefined
             ? update.showPackProgress
             : existing.showPackProgress,
+        hourlyRateCents:
+          update.hourlyRateCents !== undefined
+            ? update.hourlyRateCents
+            : existing.hourlyRateCents,
       })
       .where(eq(clients.id, id))
       .returning();
@@ -275,8 +300,30 @@ export class PostgresRepository
       sortComments(list);
     }
 
+    // Batch-load all work sessions for the listed tasks (single IN query).
+    const sessionRows =
+      taskIds.length > 0
+        ? await db
+            .select()
+            .from(workSessions)
+            .where(inArray(workSessions.taskId, taskIds))
+        : [];
+    const sessionsByTask = new Map<string, WorkSession[]>();
+    for (const s of sessionRows) {
+      const list = sessionsByTask.get(s.taskId) ?? [];
+      list.push(mapWorkSession(s));
+      sessionsByTask.set(s.taskId, list);
+    }
+    for (const list of sessionsByTask.values()) {
+      sortSessions(list);
+    }
+
     return [...grouped.values()].map((row) =>
-      mapTask(row, commentsByTask.get(row.id) ?? []),
+      mapTask(
+        row,
+        commentsByTask.get(row.id) ?? [],
+        sessionsByTask.get(row.id) ?? [],
+      ),
     );
   }
 
@@ -293,9 +340,14 @@ export class PostgresRepository
       .select()
       .from(comments)
       .where(eq(comments.taskId, id));
+    const sessionRows = await db
+      .select()
+      .from(workSessions)
+      .where(eq(workSessions.taskId, id));
     return mapTask(
       { ...row, att: attRows },
       sortComments(commentRows.map(mapComment)),
+      sortSessions(sessionRows.map(mapWorkSession)),
     );
   }
 
@@ -352,7 +404,8 @@ export class PostgresRepository
       return null;
     }
     const status = update.status ?? existing.status;
-    const completedAt = resolveCompletedAt(status, new Date(), existing.completedAt);
+    const now = new Date();
+    const completedAt = resolveCompletedAt(status, now, existing.completedAt);
 
     // Auto-fill: assigning a service to a task whose amount is still zero
     // populates the service default cost (mirrors createTask behavior).
@@ -387,10 +440,18 @@ export class PostgresRepository
         serviceId:
           update.serviceId !== undefined ? update.serviceId : existing.serviceId,
         completedAt,
-        updatedAt: new Date(),
+        updatedAt: now,
       })
       .where(eq(tasks.id, id))
       .returning();
+
+    // Moving into done auto-stops a running timer at the completion time.
+    if (status === "done") {
+      await db
+        .update(workSessions)
+        .set({ endedAt: now })
+        .where(and(eq(workSessions.taskId, id), isNull(workSessions.endedAt)));
+    }
 
     const attRows = await db
       .select()
@@ -400,16 +461,21 @@ export class PostgresRepository
       .select()
       .from(comments)
       .where(eq(comments.taskId, id));
+    const sessionRows = await db
+      .select()
+      .from(workSessions)
+      .where(eq(workSessions.taskId, id));
 
     return mapTask(
       { ...updated, att: attRows },
       sortComments(commentRows.map(mapComment)),
+      sortSessions(sessionRows.map(mapWorkSession)),
     );
   }
 
   async deleteTask(id: string): Promise<void> {
-    // Cascade delete of attachments and comments happens in the DB
-    // (onDelete: 'cascade' on both tables).
+    // Cascade delete of attachments, comments and work sessions happens in the DB
+    // (onDelete: 'cascade' on those tables).
     await db.delete(tasks).where(eq(tasks.id, id));
   }
 
@@ -441,6 +507,43 @@ export class PostgresRepository
       })
       .returning();
     return mapComment(row);
+  }
+
+  async startWorkSession(
+    taskId: string,
+    now: Date = new Date(),
+  ): Promise<WorkSession | null> {
+    const [task] = await db
+      .select({ status: tasks.status })
+      .from(tasks)
+      .where(eq(tasks.id, taskId));
+    if (!task || task.status === "done") {
+      return null;
+    }
+    const [running] = await db
+      .select()
+      .from(workSessions)
+      .where(and(eq(workSessions.taskId, taskId), isNull(workSessions.endedAt)));
+    if (running) {
+      return mapWorkSession(running);
+    }
+    const [row] = await db
+      .insert(workSessions)
+      .values({ taskId, startedAt: now })
+      .returning();
+    return mapWorkSession(row);
+  }
+
+  async stopWorkSession(
+    taskId: string,
+    now: Date = new Date(),
+  ): Promise<WorkSession | null> {
+    const [row] = await db
+      .update(workSessions)
+      .set({ endedAt: now })
+      .where(and(eq(workSessions.taskId, taskId), isNull(workSessions.endedAt)))
+      .returning();
+    return row ? mapWorkSession(row) : null;
   }
 
   async listServicesByClient(clientId: string): Promise<ServiceOption[]> {

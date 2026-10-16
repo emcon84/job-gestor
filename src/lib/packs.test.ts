@@ -21,6 +21,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     completedAt: null,
     attachments: [],
     comments: [],
+    workSessions: [],
     ...overrides,
   };
 }

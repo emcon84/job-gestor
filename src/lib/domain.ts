@@ -46,6 +46,11 @@ export interface Client {
   portalMessage: string | null;
   /** Whether to show the pack spending bar. false = hide it (e.g. prepaid client). */
   showPackProgress: boolean;
+  /**
+   * Hourly rate in ARS, stored as integer cents. null = pack mode (default);
+   * not null = hourly mode, where task amounts derive from tracked hours.
+   */
+  hourlyRateCents: number | null;
   createdAt: Date;
 }
 
@@ -62,6 +67,8 @@ export interface NewClient {
   portalMessage?: string | null;
   /** Whether to show the pack spending bar. Defaults to true (visible). */
   showPackProgress?: boolean;
+  /** Hourly rate in cents. Omit/null = pack mode. */
+  hourlyRateCents?: number | null;
 }
 
 /** Fields the owner may edit on an existing client. */
@@ -77,6 +84,8 @@ export interface ClientUpdate {
   portalMessage?: string | null;
   /** Whether to show the pack spending bar. `undefined` keeps the current value. */
   showPackProgress?: boolean;
+  /** Hourly rate in cents. `undefined` keeps it, `null` returns to pack mode. */
+  hourlyRateCents?: number | null;
 }
 
 /** Validates a client login username (lowercase letters/digits/_- , 3-32). */
@@ -215,6 +224,14 @@ export interface ServiceOption {
   defaultCostArs: number;
 }
 
+/** A timed stretch of work on a task. `endedAt` null = still running. */
+export interface WorkSession {
+  id: string;
+  taskId: string;
+  startedAt: Date;
+  endedAt: Date | null;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -239,6 +256,8 @@ export interface Task {
   attachments: Attachment[];
   /** Comment thread for this task, oldest first. Loaded with the task. */
   comments: Comment[];
+  /** Timer sessions for this task, oldest first. Loaded with the task. */
+  workSessions: WorkSession[];
 }
 
 /** Fields required to create a new task (client submits these). */

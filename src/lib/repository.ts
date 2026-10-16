@@ -25,6 +25,7 @@ import type {
   ServiceUpdate,
   Task,
   TaskUpdate,
+  WorkSession,
 } from "./domain";
 
 /**
@@ -76,6 +77,13 @@ export interface TaskRepository {
   listCommentsByTask(taskId: string): Promise<Comment[]>;
   /** Adds a comment to a task. Returns null when the task doesn't exist. */
   addComment(input: NewComment): Promise<Comment | null>;
+  /**
+   * Starts a timer session on a task. Returns null when the task is missing or
+   * already done. When a session is already running, returns that one (no-op).
+   */
+  startWorkSession(taskId: string, now?: Date): Promise<WorkSession | null>;
+  /** Closes the task's open session and returns it, or null when none is open. */
+  stopWorkSession(taskId: string, now?: Date): Promise<WorkSession | null>;
   /** Lists all stored push subscriptions (one per device/browser). */
   listPushSubscriptions(): Promise<PushSubscription[]>;
   /** Stores a push subscription, upserting by endpoint. */

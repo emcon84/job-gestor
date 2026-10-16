@@ -20,6 +20,7 @@ import type {
   ServiceUpdate,
   Task,
   TaskUpdate,
+  WorkSession,
 } from "../domain";
 import { resolveCompletedAt } from "../domain";
 import type {
@@ -88,6 +89,7 @@ export class MemoryRepository
       username: input.username ?? null,
       portalMessage: input.portalMessage ?? null,
       showPackProgress: input.showPackProgress ?? true,
+      hourlyRateCents: input.hourlyRateCents ?? null,
       createdAt: new Date(),
     };
     this.clients.set(client.id, client);
@@ -117,6 +119,10 @@ export class MemoryRepository
         update.showPackProgress !== undefined
           ? update.showPackProgress
           : existing.showPackProgress,
+      hourlyRateCents:
+        update.hourlyRateCents !== undefined
+          ? update.hourlyRateCents
+          : existing.hourlyRateCents,
     };
     this.clients.set(id, updated);
     if (update.passwordHash !== undefined && update.passwordHash !== null) {
@@ -139,6 +145,7 @@ export class MemoryRepository
   async listTasksByClient(clientId: string): Promise<Task[]> {
     return [...this.tasks.values()]
       .filter((t) => t.clientId === clientId)
+      .map((t) => this.withSortedSessions(t))
       .sort((a, b) => {
         const ta = a.createdAt.getTime();
         const tb = b.createdAt.getTime();
@@ -151,7 +158,8 @@ export class MemoryRepository
   }
 
   async getTask(id: string): Promise<Task | null> {
-    return this.tasks.get(id) ?? null;
+    const task = this.tasks.get(id);
+    return task ? this.withSortedSessions(task) : null;
   }
 
   async createTask(input: NewTask): Promise<Task> {
@@ -175,6 +183,7 @@ export class MemoryRepository
       completedAt: null,
       attachments: input.attachments.map((a) => ({ ...a })),
       comments: [],
+      workSessions: [],
     };
     this.tasks.set(task.id, task);
     this.order.set(task.id, this.seq++);
@@ -187,6 +196,7 @@ export class MemoryRepository
       return null;
     }
     const status = update.status ?? existing.status;
+    const now = new Date();
     // Auto-fill: assigning a service to a task whose amount is still zero
     // populates the service default cost (mirrors createTask behavior).
     let amountArs =
@@ -217,17 +227,67 @@ export class MemoryRepository
           : existing.paymentDueDate,
       serviceId:
         update.serviceId !== undefined ? update.serviceId : existing.serviceId,
-      completedAt: resolveCompletedAt(status, new Date(), existing.completedAt),
-      updatedAt: new Date(),
+      completedAt: resolveCompletedAt(status, now, existing.completedAt),
+      updatedAt: now,
+      // Moving into done auto-stops a running timer at the completion time.
+      workSessions:
+        status === "done"
+          ? existing.workSessions.map((s) =>
+              s.endedAt === null ? { ...s, endedAt: now } : s,
+            )
+          : existing.workSessions,
     };
     this.tasks.set(id, updated);
-    return updated;
+    return this.withSortedSessions(updated);
   }
 
   async deleteTask(id: string): Promise<void> {
     this.tasks.delete(id);
     this.order.delete(id);
     this.comments.delete(id);
+  }
+
+  async startWorkSession(
+    taskId: string,
+    now: Date = new Date(),
+  ): Promise<WorkSession | null> {
+    const task = this.tasks.get(taskId);
+    if (!task || task.status === "done") {
+      return null;
+    }
+    const running = task.workSessions.find((s) => s.endedAt === null);
+    if (running) {
+      return { ...running };
+    }
+    const session: WorkSession = {
+      id: randomUUID(),
+      taskId,
+      startedAt: now,
+      endedAt: null,
+    };
+    task.workSessions.push(session);
+    return { ...session };
+  }
+
+  async stopWorkSession(
+    taskId: string,
+    now: Date = new Date(),
+  ): Promise<WorkSession | null> {
+    const task = this.tasks.get(taskId);
+    const running = task?.workSessions.find((s) => s.endedAt === null);
+    if (!running) {
+      return null;
+    }
+    running.endedAt = now;
+    return { ...running };
+  }
+
+  /** Returns the task with its work sessions ordered oldest first. */
+  private withSortedSessions(task: Task): Task {
+    task.workSessions.sort(
+      (a, b) => a.startedAt.getTime() - b.startedAt.getTime(),
+    );
+    return task;
   }
 
   async listCommentsByTask(taskId: string): Promise<Comment[]> {

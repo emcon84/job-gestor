@@ -553,3 +553,136 @@ describe("MemoryRepository push subscriptions", () => {
     expect(await repo.listPushSubscriptions()).toEqual([]);
   });
 });
+describe("MemoryRepository hourly rate", () => {
+  it("defaults hourlyRateCents to null and stores it on create", async () => {
+    const repo = new MemoryRepository();
+    const plain = await repo.createClient({
+      name: "A",
+      slug: "a",
+      packThresholdCents: 1,
+    });
+    expect(plain.hourlyRateCents).toBeNull();
+    const hourly = await repo.createClient({
+      name: "Oslo",
+      slug: "oslo",
+      packThresholdCents: 1,
+      hourlyRateCents: 8_000_00,
+    });
+    expect(hourly.hourlyRateCents).toBe(8_000_00);
+  });
+
+  it("updates, keeps and clears hourlyRateCents", async () => {
+    const repo = new MemoryRepository();
+    const c = await repo.createClient({
+      name: "A",
+      slug: "a",
+      packThresholdCents: 1,
+    });
+    const set = await repo.updateClient(c.id, { hourlyRateCents: 5_000_00 });
+    expect(set?.hourlyRateCents).toBe(5_000_00);
+    const kept = await repo.updateClient(c.id, { name: "B" });
+    expect(kept?.hourlyRateCents).toBe(5_000_00);
+    const cleared = await repo.updateClient(c.id, { hourlyRateCents: null });
+    expect(cleared?.hourlyRateCents).toBeNull();
+  });
+});
+
+describe("MemoryRepository work sessions", () => {
+  let repo: MemoryRepository;
+  let taskId: string;
+  const t0 = new Date("2026-03-01T10:00:00Z");
+  const t1 = new Date("2026-03-01T11:30:00Z");
+  const t2 = new Date("2026-03-02T09:00:00Z");
+  const t3 = new Date("2026-03-02T10:00:00Z");
+
+  beforeEach(async () => {
+    repo = new MemoryRepository();
+    await setupClientAndService(repo);
+    taskId = (await repo.createTask(sampleTask())).id;
+  });
+
+  it("creates tasks with no work sessions", async () => {
+    expect((await repo.getTask(taskId))?.workSessions).toEqual([]);
+  });
+
+  it("starts a session with the given time and no end", async () => {
+    const s = await repo.startWorkSession(taskId, t0);
+    expect(s).toMatchObject({ taskId, startedAt: t0, endedAt: null });
+    expect(s?.id).toBeTruthy();
+    expect((await repo.getTask(taskId))?.workSessions).toHaveLength(1);
+  });
+
+  it("returns null when starting a session on a missing task", async () => {
+    expect(await repo.startWorkSession("missing", t0)).toBeNull();
+  });
+
+  it("returns the already running session instead of opening a second one", async () => {
+    const first = await repo.startWorkSession(taskId, t0);
+    const again = await repo.startWorkSession(taskId, t1);
+    expect(again?.id).toBe(first?.id);
+    expect(again?.startedAt).toEqual(t0);
+    expect((await repo.getTask(taskId))?.workSessions).toHaveLength(1);
+  });
+
+  it("refuses to start a session on a done task", async () => {
+    await repo.updateTask(taskId, { status: "done" });
+    expect(await repo.startWorkSession(taskId, t0)).toBeNull();
+  });
+
+  it("stops the open session and returns it closed", async () => {
+    await repo.startWorkSession(taskId, t0);
+    const stopped = await repo.stopWorkSession(taskId, t1);
+    expect(stopped).toMatchObject({ startedAt: t0, endedAt: t1 });
+    expect((await repo.getTask(taskId))?.workSessions[0].endedAt).toEqual(t1);
+  });
+
+  it("returns null when stopping with no open session or missing task", async () => {
+    expect(await repo.stopWorkSession(taskId, t1)).toBeNull();
+    expect(await repo.stopWorkSession("missing", t1)).toBeNull();
+  });
+
+  it("lists sessions oldest first via listTasksByClient and getTask", async () => {
+    await repo.startWorkSession(taskId, t2);
+    await repo.stopWorkSession(taskId, t3);
+    // Insert an earlier session after the later one.
+    const task = await repo.getTask(taskId);
+    task!.workSessions.unshift({
+      id: "early",
+      taskId,
+      startedAt: t0,
+      endedAt: t1,
+    });
+    const viaList = (await repo.listTasksByClient(sampleTask.defaultClientId))[0];
+    expect(viaList.workSessions.map((s) => s.startedAt)).toEqual([t0, t2]);
+    expect(
+      (await repo.getTask(taskId))?.workSessions.map((s) => s.startedAt),
+    ).toEqual([t0, t2]);
+  });
+
+  it("auto-stops a running session when the task moves to done, using completedAt", async () => {
+    await repo.startWorkSession(taskId, t0);
+    const done = await repo.updateTask(taskId, { status: "done" });
+    expect(done?.completedAt).toBeInstanceOf(Date);
+    expect(done?.workSessions).toHaveLength(1);
+    expect(done?.workSessions[0].endedAt).toEqual(done?.completedAt);
+  });
+
+  it("keeps closed sessions untouched and running ones open for non-done updates", async () => {
+    await repo.startWorkSession(taskId, t0);
+    await repo.stopWorkSession(taskId, t1);
+    await repo.startWorkSession(taskId, t2);
+    const moved = await repo.updateTask(taskId, { status: "in_progress" });
+    expect(moved?.workSessions[0].endedAt).toEqual(t1);
+    expect(moved?.workSessions[1].endedAt).toBeNull();
+    const done = await repo.updateTask(taskId, { status: "done" });
+    expect(done?.workSessions[0].endedAt).toEqual(t1);
+    expect(done?.workSessions[1].endedAt).toEqual(done?.completedAt);
+  });
+
+  it("drops sessions together with the task", async () => {
+    await repo.startWorkSession(taskId, t0);
+    await repo.deleteTask(taskId);
+    expect(await repo.getTask(taskId)).toBeNull();
+    expect(await repo.stopWorkSession(taskId, t1)).toBeNull();
+  });
+});

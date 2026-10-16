@@ -30,6 +30,8 @@ export const clients = pgTable("clients", {
   portalMessage: text("portal_message"),
   // Whether to show the pack spending bar. false = hide it (e.g. prepaid client).
   showPackProgress: boolean("show_pack_progress").notNull().default(true),
+  // Hourly rate in cents. Null = pack mode; not null = hourly billing mode.
+  hourlyRateCents: integer("hourly_rate_cents"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -109,6 +111,22 @@ export const comments = pgTable("comments", {
 });
 
 /**
+ * Timer sessions per task (hourly billing). `endedAt` null = still running;
+ * at most one open session per task is enforced by the repositories.
+ */
+export const workSessions = pgTable("work_sessions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  taskId: uuid("task_id")
+    .notNull()
+    .references(() => tasks.id, { onDelete: "cascade" }),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+  endedAt: timestamp("ended_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+/**
  * Browser Web Push subscriptions (endpoint + encryption keys). One row per
  * device/browser that opted in on the shared portal. Upserted by endpoint so
  * re-subscribing with the same push service never duplicates a row.
@@ -129,6 +147,8 @@ export type AttachmentRow = typeof attachments.$inferSelect;
 export type NewAttachmentRow = typeof attachments.$inferInsert;
 export type CommentRow = typeof comments.$inferSelect;
 export type NewCommentRow = typeof comments.$inferInsert;
+export type WorkSessionRow = typeof workSessions.$inferSelect;
+export type NewWorkSessionRow = typeof workSessions.$inferInsert;
 export type ServiceRow = typeof services.$inferSelect;
 export type NewServiceRow = typeof services.$inferInsert;
 export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
