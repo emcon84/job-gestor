@@ -5,6 +5,7 @@ import { FileDown } from "lucide-react";
 import KanbanBoard from "@/components/KanbanBoard";
 import ProgressBar from "@/components/ProgressBar";
 import RefreshOnMount from "@/components/RefreshOnMount";
+import SectionNav from "@/components/SectionNav";
 import ServiceAdmin from "@/components/ServiceAdmin";
 import ClientEdit from "@/components/ClientEdit";
 import { COOKIE_VALUE } from "@/lib/auth";
@@ -49,6 +50,21 @@ export default async function OwnerClientPage({
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-6">
       <RefreshOnMount />
+      <SectionNav
+        links={[
+          { href: "#tablero", label: "Tablero" },
+          { href: "#cliente", label: "Cliente" },
+          { href: "#servicios", label: "Servicios" },
+        ]}
+        trailing={
+          <Link
+            href={`/c/${client.slug}`}
+            className="rounded-lg px-3 py-2 text-xs text-muted transition-colors hover:bg-surface hover:text-primary"
+          >
+            Ver portal
+          </Link>
+        }
+      />
 
       {r2Issue && (
         <div
@@ -109,19 +125,21 @@ export default async function OwnerClientPage({
         </section>
       )}
 
-      <section className="mb-6">
+      <section id="tablero" className="mb-6 scroll-mt-20">
+        <KanbanBoard
+          columns={columns}
+          services={services}
+          hourlyRateCents={client.hourlyRateCents}
+        />
+      </section>
+
+      <section id="cliente" className="mb-6 scroll-mt-20">
         <ClientEdit client={client} />
       </section>
 
-      <section className="mb-6">
+      <section id="servicios" className="mb-6 scroll-mt-20">
         <ServiceAdmin clientId={client.id} services={services} />
       </section>
-
-      <KanbanBoard
-        columns={columns}
-        services={services}
-        hourlyRateCents={client.hourlyRateCents}
-      />
     </main>
   );
 }

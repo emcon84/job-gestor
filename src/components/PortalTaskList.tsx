@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   MAX_CLIENT_MOVES,
@@ -16,6 +16,8 @@ import { effectiveAmountCents } from "@/lib/hours";
 import AttachmentThumbs from "@/components/AttachmentThumbs";
 import PaymentBadge from "@/components/PaymentBadge";
 import PortalTaskItem from "@/components/PortalTaskItem";
+import Pagination from "@/components/Pagination";
+import { paginate } from "@/lib/task-view";
 import { moveTaskStatusClient } from "@/app/actions";
 import { COLUMNS, MOVE_BUTTON_COLOR, STATUS_ICON } from "@/components/kanban-meta";
 
@@ -34,6 +36,10 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 type PaymentFilter = "all" | "pending" | "paid";
+type StatusFilter = TaskStatus | "all";
+
+/** Tasks per page in the portal list. */
+const PAGE_SIZE = 10;
 
 const FILTERS: { value: PaymentFilter; label: string }[] = [
   { value: "all", label: "Todas" },
@@ -63,6 +69,9 @@ export default function PortalTaskList({
 }) {
   const router = useRouter();
   const [filter, setFilter] = useState<PaymentFilter>("all");
+  const [status, setStatus] = useState<StatusFilter>("all");
+  const [page, setPage] = useState(1);
+  const topRef = useRef<HTMLDivElement>(null);
   const [movingId, setMovingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -80,10 +89,23 @@ export default function PortalTaskList({
     router.refresh();
   }
 
-  const visible = tasks.filter((t) => matchesFilter(t, filter));
+  const byStatus = tasks.filter((t) => status === "all" || t.status === status);
+  const matching = byStatus.filter((t) => matchesFilter(t, filter));
+  const current = paginate(matching, page, PAGE_SIZE);
+  const visible = current.items;
+
+  function changePage(next: number) {
+    setPage(next);
+    topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  const tabs: { value: StatusFilter; label: string }[] = [
+    { value: "all", label: "Todas" },
+    ...COLUMNS.map((c) => ({ value: c.status as StatusFilter, label: c.label })),
+  ];
 
   return (
-    <div className="space-y-4">
+    <div ref={topRef} className="scroll-mt-20 space-y-4">
       {error && (
         <p
           role="alert"
@@ -94,20 +116,55 @@ export default function PortalTaskList({
       )}
       <div
         role="group"
+        aria-label="Filtrar por estado de la tarea"
+        className="flex gap-1 overflow-x-auto border-b border-card-border"
+      >
+        {tabs.map((t) => {
+          const count =
+            t.value === "all"
+              ? tasks.length
+              : tasks.filter((task) => task.status === t.value).length;
+          const active = status === t.value;
+          return (
+            <button
+              key={t.value}
+              type="button"
+              aria-pressed={active}
+              onClick={() => {
+                setStatus(t.value);
+                setPage(1);
+              }}
+              className={`-mb-px min-h-11 shrink-0 border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+                active
+                  ? "border-accent text-primary"
+                  : "border-transparent text-muted hover:text-primary"
+              }`}
+            >
+              {t.label} ({count})
+            </button>
+          );
+        })}
+      </div>
+
+      <div
+        role="group"
         aria-label="Filtrar por estado de pago"
         className="flex flex-wrap gap-2"
       >
         {FILTERS.map((f) => {
           const count =
             f.value === "all"
-              ? tasks.length
-              : tasks.filter((t) => matchesFilter(t, f.value)).length;
+              ? byStatus.length
+              : byStatus.filter((t) => matchesFilter(t, f.value)).length;
           const active = filter === f.value;
           return (
             <button
               key={f.value}
               type="button"
-              onClick={() => setFilter(f.value)}
+              onClick={() => {
+                setFilter(f.value);
+                setPage(1);
+              }}
               aria-pressed={active}
               className={`min-h-11 rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
                 active
@@ -150,7 +207,7 @@ export default function PortalTaskList({
                 </span>
               </div>
 
-              <p className="whitespace-pre-wrap text-sm text-secondary">
+              <p className="line-clamp-2 whitespace-pre-wrap text-sm text-secondary">
                 {task.description}
               </p>
 
@@ -196,6 +253,12 @@ export default function PortalTaskList({
           ))}
         </ul>
       )}
+
+      <Pagination
+        page={current.page}
+        totalPages={current.totalPages}
+        onChange={changePage}
+      />
     </div>
   );
 }

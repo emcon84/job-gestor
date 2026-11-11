@@ -9,6 +9,8 @@ import { formatArs } from "@/lib/format";
 import { effectiveAmountCents, formatHours, totalWorkedMs } from "@/lib/hours";
 import AttachmentThumbs from "@/components/AttachmentThumbs";
 import TaskDetailModal from "@/components/TaskDetailModal";
+import TaskFilters from "@/components/TaskFilters";
+import { filterTasks, sortRecentlyCompleted, type TaskFilter } from "@/lib/task-view";
 import { hasRunningSession, useNow } from "@/components/work-hours";
 import {
   COLUMNS,
@@ -17,7 +19,10 @@ import {
   STATUS_VALUE,
 } from "@/components/kanban-meta";
 
-const COLUMN_ACCENT: Record<TaskStatus, string> = {
+/** How many completed tasks the "Hecho" column shows before "Ver todas". */
+const DONE_PREVIEW = 10;
+
+const COLUMN_ACCENT:Record<TaskStatus, string> = {
   pending: "border-status-pending",
   in_progress: "border-status-progress",
   revision: "border-sky-400",
@@ -35,6 +40,8 @@ export default function KanbanBoard({
   hourlyRateCents: number | null;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [filter, setFilter] = useState<TaskFilter>({ query: "", priority: "all" });
+  const [showAllDone, setShowAllDone] = useState(false);
   // Resolve from the current columns so the drawer reflects refreshed data
   // (e.g. a just-started work session) instead of a stale snapshot.
   const selected =
@@ -44,36 +51,71 @@ export default function KanbanBoard({
           .flat()
           .find((t) => t.id === selectedId) ?? null);
 
+  const filtering = filter.query.trim() !== "" || filter.priority !== "all";
+
   return (
     <>
+      <div className="mb-4">
+        <TaskFilters value={filter} onChange={setFilter} />
+      </div>
       <div className="overflow-x-auto pb-2">
         <div className="flex min-w-max gap-4">
-          {COLUMNS.map((col) => (
-            <section
-              key={col.status}
-              className={`w-64 shrink-0 rounded-2xl border border-t-4 ${COLUMN_ACCENT[col.status]} bg-surface/40 p-3`}
-            >
-              <h2 className="mb-3 px-1 text-sm font-semibold text-primary">
-                {col.label}{" "}
-                <span className="text-muted">({columns[col.status].length})</span>
-              </h2>
-              <div className="space-y-3">
-                {columns[col.status].length === 0 && (
-                  <p className="rounded-xl border border-dashed border-card-border px-3 py-6 text-center text-xs text-muted">
-                    Sin tareas
-                  </p>
-                )}
-                {columns[col.status].map((task) => (
-                  <KanbanCard
-                    key={task.id}
-                    task={task}
-                    hourlyRateCents={hourlyRateCents}
-                    onOpen={() => setSelectedId(task.id)}
-                  />
-                ))}
-              </div>
-            </section>
-          ))}
+          {COLUMNS.map((col) => {
+            const matching = filterTasks(columns[col.status], filter);
+            const ordered =
+              col.status === "done" ? sortRecentlyCompleted(matching) : matching;
+            // "Done" grows forever: show only the most recent ones unless the
+            // owner asks for all of them or is actively searching.
+            const collapsed =
+              col.status === "done" &&
+              !showAllDone &&
+              !filtering &&
+              ordered.length > DONE_PREVIEW;
+            const shown = collapsed ? ordered.slice(0, DONE_PREVIEW) : ordered;
+            return (
+              <section
+                key={col.status}
+                className={`flex w-72 shrink-0 flex-col rounded-2xl border border-t-4 ${COLUMN_ACCENT[col.status]} bg-surface/40 p-3`}
+              >
+                <h2 className="mb-3 px-1 text-sm font-semibold text-primary">
+                  {col.label}{" "}
+                  <span className="text-muted">
+                    ({filtering ? `${matching.length}/` : ""}
+                    {columns[col.status].length})
+                  </span>
+                </h2>
+                {/* Fixed-height column: cards scroll inside, header stays put. */}
+                <div className="max-h-[70vh] space-y-3 overflow-y-auto pr-1">
+                  {shown.length === 0 && (
+                    <p className="rounded-xl border border-dashed border-card-border px-3 py-6 text-center text-xs text-muted">
+                      {filtering ? "Sin resultados" : "Sin tareas"}
+                    </p>
+                  )}
+                  {shown.map((task) => (
+                    <KanbanCard
+                      key={task.id}
+                      task={task}
+                      hourlyRateCents={hourlyRateCents}
+                      onOpen={() => setSelectedId(task.id)}
+                    />
+                  ))}
+                  {col.status === "done" &&
+                    !filtering &&
+                    ordered.length > DONE_PREVIEW && (
+                      <button
+                        type="button"
+                        onClick={() => setShowAllDone((v) => !v)}
+                        className="min-h-11 w-full rounded-lg border border-card-border bg-surface px-3 py-2 text-sm text-secondary transition-colors hover:border-accent hover:text-primary"
+                      >
+                        {collapsed
+                          ? `Ver todas (${ordered.length})`
+                          : `Mostrar solo las últimas ${DONE_PREVIEW}`}
+                      </button>
+                    )}
+                </div>
+              </section>
+            );
+          })}
         </div>
       </div>
 

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { FileDown, Info } from "lucide-react";
+import { FileDown, Info, KeyRound } from "lucide-react";
+import SectionNav from "@/components/SectionNav";
 import SubmitForm from "@/components/SubmitForm";
 import TaskList from "@/components/TaskList";
 import ProgressBar from "@/components/ProgressBar";
@@ -33,6 +34,22 @@ export default async function ClientPortalPage({
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-6 pb-28">
       <RefreshOnMount />
+      <SectionNav
+        links={[
+          { href: "#tareas", label: "Tareas" },
+          { href: "#nueva-tarea", label: "Nueva tarea" },
+          { href: "#abono", label: "Tu abono" },
+        ]}
+        trailing={
+          <Link
+            href="/owner"
+            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs text-muted transition-colors hover:bg-surface hover:text-primary"
+          >
+            <KeyRound className="h-3.5 w-3.5" aria-hidden />
+            Propietario
+          </Link>
+        }
+      />
       <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-primary">
@@ -52,12 +69,12 @@ export default async function ClientPortalPage({
         </a>
       </header>
 
-      <section className="mb-10">
+      <section id="nueva-tarea" className="mb-10 scroll-mt-20">
         <h2 className="mb-3 text-lg font-semibold text-primary">Nueva tarea</h2>
         <SubmitForm services={services} clientId={client.id} />
       </section>
 
-      <section className="mb-10">
+      <section id="abono" className="mb-10 scroll-mt-20">
         <h2 className="mb-3 text-lg font-semibold text-primary">Tu abono</h2>
         <div
           role="note"
@@ -89,21 +106,12 @@ export default async function ClientPortalPage({
         )}
       </section>
 
-      <section>
+      <section id="tareas" className="scroll-mt-20">
         <h2 className="mb-3 text-lg font-semibold text-primary">
           Tareas enviadas
         </h2>
         <TaskList tasks={tasks} hourlyRateCents={client.hourlyRateCents} />
       </section>
-
-      <footer className="mt-10 border-t border-card-border pt-4 text-center">
-        <Link
-          href="/owner"
-          className="text-xs text-muted transition-colors hover:text-primary"
-        >
-          Acceso del propietario
-        </Link>
-      </footer>
     </main>
   );
 }
