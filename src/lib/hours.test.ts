@@ -33,6 +33,7 @@ function taskWith(sessions: WorkSession[], amountArs = 1_000_00): Task {
     status: "in_progress",
     clientMoveCount: 0,
     amountArs,
+    fixedAmount: false,
     paymentState: null,
     paymentDueDate: null,
     serviceId: null,
@@ -155,6 +156,16 @@ describe("effectiveAmountCents", () => {
     );
     const odd = taskWith([session("2026-03-01T10:00:00Z", "2026-03-01T10:00:01Z")]);
     expect(effectiveAmountCents(odd, { hourlyRateCents: 1_00 }, NOW)).toBe(0);
+  });
+
+  it("keeps the stored amount of a fixed-amount task for hourly clients", () => {
+    const task = {
+      ...taskWith([session("2026-03-01T10:00:00Z", "2026-03-01T12:00:00Z")], 50_000_00),
+      fixedAmount: true,
+    };
+    expect(effectiveAmountCents(task, { hourlyRateCents: 10_000_00 }, NOW)).toBe(
+      50_000_00,
+    );
   });
 
   it("is zero for an hourly client with no sessions", () => {

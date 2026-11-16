@@ -99,6 +99,13 @@
       "when": 1792159069702,
       "tag": "0013_whole_proemial_gods",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1794857614563,
+      "tag": "0014_add_task_fixed_amount",
+      "breakpoints": true
     }
   ]
 }

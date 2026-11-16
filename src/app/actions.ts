@@ -182,6 +182,66 @@ export async function createTask(formData: FormData): Promise<ActionResult> {
   return { ok: true, message: "Tarea enviada correctamente." };
 }
 
+/**
+ * Owner-only: creates a task for a client with a fixed amount (pesos -> cents).
+ * The amount is billed as-is, also for hourly clients (tracked hours are
+ * ignored). Takes title/description/area/priority and an optional `serviceId`;
+ * no attachments and no push notification (the owner is the author).
+ */
+export async function createOwnerTask(formData: FormData): Promise<ActionResult> {
+  if (!(await isOwner())) {
+    return { ok: false, error: "No autorizado." };
+  }
+  const clientId = (formData.get("clientId") as string | null)?.trim() ?? "";
+  const title = (formData.get("title") as string | null)?.trim() ?? "";
+  const description = (formData.get("description") as string | null)?.trim() ?? "";
+  const area = (formData.get("area") as string | null)?.trim() ?? "";
+  const priority = (formData.get("priority") as string | null) ?? "medium";
+  const serviceId =
+    (formData.get("serviceId") as string | null)?.trim() || null;
+  const amountRaw = (formData.get("amountArs") as string | null) ?? "";
+
+  if (!clientId) {
+    return { ok: false, error: "Falta el cliente." };
+  }
+  if (!title) {
+    return { ok: false, error: "El título es obligatorio." };
+  }
+  if (!area) {
+    return { ok: false, error: "El área o sistema es obligatorio." };
+  }
+  const amountArs = parsePesosToCents(amountRaw);
+  if (amountArs === null) {
+    return { ok: false, error: "Monto inválido." };
+  }
+  const validPriority: Priority = PRIORITIES.includes(priority as Priority)
+    ? (priority as Priority)
+    : "medium";
+
+  const repo = await getRepository();
+  const client = await repo.getClient(clientId);
+  if (!client) {
+    return { ok: false, error: "El cliente no existe." };
+  }
+  if (serviceId && (await repo.resolveServiceCost(serviceId)) === null) {
+    return { ok: false, error: "El servicio seleccionado no existe." };
+  }
+  await repo.createTask({
+    title,
+    description,
+    area,
+    priority: validPriority,
+    serviceId,
+    clientId,
+    attachments: [],
+    amountArs,
+    fixedAmount: true,
+  });
+
+  revalidateClient(client.slug);
+  return { ok: true, message: "Tarea creada." };
+}
+
 /** Unlocks the owner session with the passphrase. Issues an httpOnly cookie on
  * success; failed attempts are rate-limited. Compatible with React's
  * `useActionState` so the unlock form can surface errors.
@@ -900,6 +960,12 @@ export async function startTimer(taskId: string): Promise<ActionResult> {
     return {
       ok: false,
       error: "La tarea está terminada: no se puede iniciar el cronómetro.",
+    };
+  }
+  if (task.fixedAmount) {
+    return {
+      ok: false,
+      error: "La tarea tiene monto fijo: no se cronometra.",
     };
   }
   const session = await repo.startWorkSession(taskId);

@@ -1,0 +1,1 @@
+ALTER TABLE "tasks" ADD COLUMN "fixed_amount" boolean DEFAULT false NOT NULL;

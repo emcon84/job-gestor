@@ -13,6 +13,7 @@ function task(overrides: Partial<Task>): Task {
     status: "pending",
     clientMoveCount: 0,
     amountArs: 0,
+    fixedAmount: false,
     paymentState: null,
     paymentDueDate: null,
     serviceId: null,

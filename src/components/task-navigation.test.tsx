@@ -28,6 +28,7 @@ function makeTasks(count: number, status: TaskStatus, prefix: string): Task[] {
       status,
       clientMoveCount: 0,
       amountArs: 0,
+      fixedAmount: false,
       paymentState: null,
       paymentDueDate: null,
       serviceId: "s",

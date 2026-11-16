@@ -76,7 +76,8 @@ function PortalTaskDetailModal({
   onClose: () => void;
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
-  const hourly = hourlyRateCents !== null;
+  // Fixed-amount tasks bill their stored amount: no hours, no timer.
+  const hourly = hourlyRateCents !== null && !task.fixedAmount;
   const now = useNow(hourly && hasRunningSession(task));
 
   useEffect(() => {

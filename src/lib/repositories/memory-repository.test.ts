@@ -193,6 +193,20 @@ describe("MemoryRepository", () => {
     expect(task.amountArs).toBe(90_000_00);
   });
 
+  it("creates a regular task as not fixed-amount", async () => {
+    const task = await repo.createTask(sampleTask());
+    expect(task.fixedAmount).toBe(false);
+  });
+
+  it("creates a fixed-amount task with the given amount over the service default", async () => {
+    const task = await repo.createTask(
+      sampleTask({ amountArs: 120_000_00, fixedAmount: true }),
+    );
+    expect(task.amountArs).toBe(120_000_00);
+    expect(task.fixedAmount).toBe(true);
+    expect((await repo.getTask(task.id))?.fixedAmount).toBe(true);
+  });
+
   it("updateTask sets a service and auto-fills the default cost on a zero-amount task", async () => {
     const svc = await repo.createService({
       name: "soporte",

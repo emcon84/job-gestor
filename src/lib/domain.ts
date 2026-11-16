@@ -243,6 +243,11 @@ export interface Task {
   clientMoveCount: number;
   /** Amount in ARS, stored as integer cents. Auto-filled from the assigned service. */
   amountArs: number;
+  /**
+   * true = the owner set a fixed amount: `amountArs` is billed as-is even for
+   * hourly clients (tracked hours are ignored). false = regular task.
+   */
+  fixedAmount: boolean;
   paymentState: PaymentState | null;
   /** Optional date by which the payment is due (null = no due date). */
   paymentDueDate: Date | null;
@@ -271,6 +276,10 @@ export interface NewTask {
   /** The client this task belongs to. */
   clientId: string;
   attachments: Attachment[];
+  /** Explicit amount in cents (owner-created tasks). Omit = service default or 0. */
+  amountArs?: number;
+  /** Bill `amountArs` as-is, ignoring tracked hours. Defaults to false. */
+  fixedAmount?: boolean;
 }
 
 /** Fields the owner may edit on an existing task (status / amount / payment). */

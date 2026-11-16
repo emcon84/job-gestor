@@ -59,7 +59,8 @@ export default function TaskDetailModal({
   const [msg, setMsg] = useState<{ kind: "error" | "success"; text: string } | null>(
     null,
   );
-  const hourly = hourlyRateCents !== null;
+  // Fixed-amount tasks bill their stored amount: no hours, no timer.
+  const hourly = hourlyRateCents !== null && !task.fixedAmount;
   const running = hasRunningSession(task);
   const now = useNow(running);
   const amountRef = useRef<HTMLInputElement>(null);
@@ -272,6 +273,11 @@ export default function TaskDetailModal({
                 className="w-full rounded-lg border border-card-border bg-surface px-2 py-2 text-sm text-primary"
               />
             </div>
+            {task.fixedAmount && hourlyRateCents !== null && (
+              <p className="text-xs text-muted">
+                Monto fijo: no se calcula por horas.
+              </p>
+            )}
             {hourly && (
               <p className="text-xs text-muted">
                 El monto se calcula según las horas registradas (

@@ -29,6 +29,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     status: "pending",
     clientMoveCount: 0,
     amountArs: 40_000_00,
+    fixedAmount: false,
     paymentState: null,
     paymentDueDate: null,
     serviceId: "s1",

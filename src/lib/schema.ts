@@ -66,6 +66,8 @@ export const tasks = pgTable("tasks", {
     .default("pending"),
   clientMoveCount: integer("client_move_count").notNull().default(0),
   amountArs: integer("amount_ars").notNull(), // cents, auto-filled from service
+  // Owner-set fixed amount: billed as-is even for hourly clients.
+  fixedAmount: boolean("fixed_amount").notNull().default(false),
   paymentState: text("payment_state", { enum: ["paid", "pending"] }),
   paymentDueDate: timestamp("payment_due_date", { withTimezone: true }),
   serviceId: uuid("service_id").references(() => services.id),

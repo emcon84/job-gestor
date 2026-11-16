@@ -130,14 +130,15 @@ export function workedByDay(
 
 /**
  * The amount a task is worth for its client: the stored amount in pack mode, or
- * tracked hours x hourly rate (rounded to whole cents) in hourly mode.
+ * tracked hours x hourly rate (rounded to whole cents) in hourly mode. A
+ * fixed-amount task always bills its stored amount.
  */
 export function effectiveAmountCents(
-  task: Pick<Task, "amountArs" | "workSessions">,
+  task: Pick<Task, "amountArs" | "workSessions"> & { fixedAmount?: boolean },
   client: Pick<Client, "hourlyRateCents">,
   now: Date = new Date(),
 ): number {
-  if (client.hourlyRateCents === null) {
+  if (client.hourlyRateCents === null || task.fixedAmount) {
     return task.amountArs;
   }
   return Math.round(

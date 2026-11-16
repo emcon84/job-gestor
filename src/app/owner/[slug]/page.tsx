@@ -8,6 +8,7 @@ import RefreshOnMount from "@/components/RefreshOnMount";
 import SectionNav from "@/components/SectionNav";
 import ServiceAdmin from "@/components/ServiceAdmin";
 import ClientEdit from "@/components/ClientEdit";
+import OwnerTaskForm from "@/components/OwnerTaskForm";
 import { COOKIE_VALUE } from "@/lib/auth";
 import { groupByStatus } from "@/lib/domain";
 import { computePacks } from "@/lib/packs";
@@ -124,6 +125,10 @@ export default async function OwnerClientPage({
           />
         </section>
       )}
+
+      <section id="nueva-tarea" className="mb-6 scroll-mt-20">
+        <OwnerTaskForm clientId={client.id} services={services} />
+      </section>
 
       <section id="tablero" className="mb-6 scroll-mt-20">
         <KanbanBoard

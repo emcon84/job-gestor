@@ -64,6 +64,7 @@ function mapTask(
     status: row.status as TaskStatus,
     clientMoveCount: row.clientMoveCount,
     amountArs: row.amountArs,
+    fixedAmount: row.fixedAmount,
     paymentState: row.paymentState as PaymentState | null,
     paymentDueDate: row.paymentDueDate,
     serviceId: row.serviceId,
@@ -362,9 +363,13 @@ export class PostgresRepository
           priority: input.priority,
           serviceId: input.serviceId,
           clientId: input.clientId,
-          // Resolve the cost from the assigned service default (authoritative);
-          // unclassified tasks start at 0.
-          amountArs: (await this.resolveServiceCost(input.serviceId)) ?? 0,
+          // An explicit (owner) amount wins; otherwise resolve the cost from the
+          // assigned service default (authoritative); unclassified tasks start at 0.
+          amountArs:
+            input.amountArs ??
+            (await this.resolveServiceCost(input.serviceId)) ??
+            0,
+          fixedAmount: input.fixedAmount ?? false,
         })
         .returning();
 

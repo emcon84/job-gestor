@@ -141,7 +141,8 @@ function KanbanCard({
   onOpen: () => void;
 }) {
   const router = useRouter();
-  const hourly = hourlyRateCents !== null;
+  // Fixed-amount tasks bill their stored amount: no hours, no timer.
+  const hourly = hourlyRateCents !== null && !task.fixedAmount;
   const running = hasRunningSession(task);
   const now = useNow(hourly && running);
   const [msg, setMsg] = useState<{ kind: "error" | "success"; text: string } | null>(
@@ -206,6 +207,11 @@ function KanbanCard({
         ) : (
           <p className="text-sm font-semibold text-primary">
             {formatArs(task.amountArs)}
+            {task.fixedAmount && hourlyRateCents !== null && (
+              <span className="ml-2 text-[10px] font-medium uppercase tracking-wide text-muted">
+                Monto fijo
+              </span>
+            )}
           </p>
         )}
 
