@@ -6,6 +6,7 @@
  * `src/app/api/report/route.ts` feeds to pdfmake. Keeping pdfmake out of this
  * module keeps it unit-testable without the heavy UMD bundle.
  */
+import type { Content } from "pdfmake/interfaces";
 import type { Client, Task } from "./domain";
 import { STATUS_LABELS } from "./domain";
 import { formatArs, formatDateEs } from "./format";
@@ -22,6 +23,7 @@ export interface ReportHeaderCell {
   text: string;
   bold: boolean;
   fillColor: string;
+  color: string;
 }
 
 export interface ReportTable {
@@ -43,6 +45,8 @@ export type ReportContent = ReportText | ReportTable;
 export interface ReportDefinition {
   pageSize: "A4";
   pageMargins: [number, number, number, number];
+  /** Static page header (author letterhead), repeated on every page. */
+  header: Content;
   content: ReportContent[];
   defaultStyle: {
     font: string;
@@ -52,7 +56,103 @@ export interface ReportDefinition {
 }
 
 const FONT = "Roboto";
-const HEADER_FILL = "#f3f4f6";
+const ACCENT = "#4338ca";
+const MUTED = "#6b7280";
+const HEADER_FILL = "#eef2ff";
+/** A4 width (595pt) minus the 40pt side margins. */
+const CONTENT_WIDTH = 515;
+
+/** Author letterhead, styled after the owner's e-mail signature. */
+const LETTERHEAD: Content = {
+  margin: [40, 28, 40, 0],
+  stack: [
+    {
+      columns: [
+        {
+          width: "auto",
+          stack: [
+            { text: "Emiliano Conti", fontSize: 13, bold: true, color: "#111827" },
+            {
+              text: "Software Engineer",
+              fontSize: 9.5,
+              bold: true,
+              color: ACCENT,
+              margin: [0, 2, 0, 0],
+            },
+            {
+              text: "& Solutions with AI",
+              fontSize: 8.5,
+              color: MUTED,
+              margin: [0, 2, 0, 0],
+            },
+          ],
+        },
+        {
+          width: "auto",
+          margin: [14, 0, 14, 0],
+          canvas: [
+            { type: "line", x1: 0, y1: 0, x2: 0, y2: 44, lineWidth: 2.5, lineColor: ACCENT },
+          ],
+        },
+        {
+          width: "*",
+          fontSize: 8.5,
+          color: MUTED,
+          stack: [
+            {
+              text: [
+                "Web: ",
+                {
+                  text: "emilianoconti.com",
+                  link: "https://emilianoconti.com",
+                  bold: true,
+                  color: ACCENT,
+                },
+              ],
+            },
+            {
+              margin: [0, 4, 0, 0],
+              text: [
+                "LinkedIn: ",
+                {
+                  text: "linkedin.com/in/emilianoconti",
+                  link: "https://linkedin.com/in/emilianoconti",
+                  color: "#1d8fd6",
+                },
+              ],
+            },
+            {
+              margin: [0, 4, 0, 0],
+              text: [
+                "GitHub: ",
+                {
+                  text: "github.com/emcon84",
+                  link: "https://github.com/emcon84",
+                  color: "#111827",
+                  decoration: "underline",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    {
+      margin: [0, 12, 0, 0],
+      canvas: [
+        {
+          type: "line",
+          x1: 0,
+          y1: 0,
+          x2: CONTENT_WIDTH,
+          y2: 0,
+          lineWidth: 0.75,
+          lineColor: "#e5e7eb",
+        },
+      ],
+    },
+  ],
+};
 
 /** Human label for a task's payment state, in Spanish. */
 export function paymentLabel(
@@ -79,7 +179,7 @@ export function isUnpaid(task: Task, amount: number = task.amountArs): boolean {
 }
 
 function tableHeaderCell(text: string): ReportHeaderCell {
-  return { text, bold: true, fillColor: HEADER_FILL };
+  return { text, bold: true, fillColor: HEADER_FILL, color: ACCENT };
 }
 
 /** Formats a 'YYYY-MM-DD' day key as dd/mm/aaaa without any time-zone shift. */
@@ -131,7 +231,13 @@ function buildSessionSections(tasks: Task[], now: Date): ReportContent[] {
     return [];
   }
   return [
-    { text: "Detalle de horas", fontSize: 12, bold: true, margin: [0, 18, 0, 0] },
+    {
+      text: "Detalle de horas",
+      fontSize: 12,
+      bold: true,
+      color: ACCENT,
+      margin: [0, 18, 0, 0],
+    },
     ...sections,
   ];
 }
@@ -173,29 +279,33 @@ export function buildReportDefinition({
     {
       text: `Generado el ${formatDateEs(new Date())}`,
       fontSize: 9,
-      color: "#555555",
-      margin: [0, 0, 0, 4],
+      color: MUTED,
+      margin: [0, 0, 0, hourlyRateCents !== null ? 18 : 4],
     },
-    {
-      text:
-        hourlyRateCents !== null
-          ? `Tarifa por hora: ${formatArs(hourlyRateCents)}`
-          : `Abono mensual: ${formatArs(client.packThresholdCents)}`,
+  ];
+  // Hourly clients: the rate is deliberately not shown on the report.
+  if (hourlyRateCents === null) {
+    content.push({
+      text: `Abono mensual: ${formatArs(client.packThresholdCents)}`,
       fontSize: 10,
       margin: [0, 0, 0, 18],
-    },
+    });
+  }
+  content.push(
     {
       text: hourlyRateCents !== null ? "Resumen" : "Resumen del abono",
       fontSize: 12,
       bold: true,
+      color: ACCENT,
       margin: [0, 0, 0, 6],
     },
     {
       text: `Total pendiente de pago: ${formatArs(summary.pendingPackCents)}`,
       fontSize: 10,
+      bold: true,
       margin: [0, 0, 2, 0],
     },
-  ];
+  );
   if (hourlyRateCents === null) {
     content.push(
       {
@@ -215,6 +325,7 @@ export function buildReportDefinition({
     text: "Tareas",
     fontSize: 12,
     bold: true,
+    color: ACCENT,
     margin: [0, 18, 0, 6],
   });
 
@@ -263,7 +374,9 @@ export function buildReportDefinition({
 
   return {
     pageSize: "A4",
-    pageMargins: [40, 40, 40, 40],
+    // Top margin leaves room for the letterhead header.
+    pageMargins: [40, 110, 40, 40],
+    header: LETTERHEAD,
     content,
     defaultStyle: {
       font: FONT,

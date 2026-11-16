@@ -55,6 +55,20 @@ function texts(doc: ReturnType<typeof buildReportDefinition>): string[] {
 }
 
 describe("buildReportDefinition", () => {
+  it("renders the author letterhead as the page header", () => {
+    const doc = buildReportDefinition({
+      client: makeClient(),
+      tasks: [],
+      summary: computePacks([], 100_000_00),
+    });
+    const header = JSON.stringify(doc.header);
+    expect(header).toContain("Emiliano Conti");
+    expect(header).toContain("Software Engineer");
+    expect(header).toContain("https://emilianoconti.com");
+    expect(header).toContain("https://linkedin.com/in/emilianoconti");
+    expect(header).toContain("https://github.com/emcon84");
+  });
+
   it("renders a header with the client name, generated date, and threshold", () => {
     const doc = buildReportDefinition({
       client: makeClient({ name: "Ferretería Ñandú" }),
@@ -307,9 +321,10 @@ describe("buildReportDefinition for hourly clients", () => {
     expect(row).toContain(formatArs(25_000_00));
   });
 
-  it("states the hourly rate and the pending total", () => {
+  it("states the pending total without exposing the hourly rate", () => {
     const all = texts(build()).join("\n");
-    expect(all).toContain(`Tarifa por hora: ${formatArs(10_000_00)}`);
+    expect(all).not.toContain("Tarifa por hora");
+    expect(all).not.toContain(formatArs(10_000_00));
     expect(all).toContain(`Total pendiente de pago: ${formatArs(25_000_00)}`);
     expect(all).not.toContain("Abono actual");
   });
